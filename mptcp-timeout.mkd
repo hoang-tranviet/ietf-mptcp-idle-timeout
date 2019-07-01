@@ -1,0 +1,225 @@
+---
+title: Multipath TCP Idle Timeout
+abbrev: mptcp-timeout
+docname: draft-hartke-xmpp-stupid-00
+date: 2009-07-05
+category: info
+
+ipr: trust200902
+area: TSV
+workgroup: MPTCP Working Group
+keyword: Internet-Draft
+
+stand_alone: yes
+pi: [toc, sortrefs, symrefs]
+
+author:
+ -
+    ins: K. Hartke
+    name: Klaus Hartke
+    organization: U. catholique de Louvain
+    email: hartke@tzi.org
+ -
+    ins: C. Bormann
+    name: Carsten Bormann
+    org: U. catholique de Louvain
+    street: Postfach 330440
+    city: Bremen
+    code: D-28359
+    country: Germany
+    phone: +49-421-218-63921
+    facsimile: +49-421-218-7000
+    email: cabo@tzi.org
+
+normative:
+  RFC2119:
+
+informative:
+  I-D.ietf-mptcp-rfc6824bis:
+  RFC5482:
+
+--- abstract
+
+This document discusses the idle timeout of MPTCP sessions,
+and defines an MPTCP Option subkind for hosts to announce and
+request this value.
+
+
+--- middle
+
+Introduction        {#problems}
+============
+
+{{I-D.ietf-mptcp-rfc6824bis}} defines the Multipath TCP.
+However, the lifetime of idle Multipath-level connections was barely discussed.
+
+There are several situations in which a host want to adjust the timeout.
+
+
+use case 1:
+
+: By reducing this timeout, a highly-loaded server can quickly
+terminate idle MPTCP connections. It can send an MPTCP option
+to signal its peers that the connections will be closed shortly.
+
+
+use case 2:
+
+: On the other hand, requesting its peer a higher value allows a host
+to extend the lifetime of the connection for the desired duration.
+
+
+
+
+The Need for Standardization   {#need}
+----------------------------
+
+An MPTCP-enabled host may have its own timing-out policy for idle sessions.
+However, in many cases, it is necessary to exchange the idle timeout value,
+which requires the standardization.
+
+For regular TCP, extending the connection lifetime by increasing 
+the idle timeout value is usually not enough since it is common 
+that the NAT/middleboxes on the path could explicitly or silently
+terminate the connection.
+
+For Multipath TCP, this is a much lesser problem since the closure
+of one or all subflows do not terminate the multipath-level session.
+
+
+Terminology          {#Terminology}
+-----------
+In this document, the key words "MUST", "MUST NOT", "REQUIRED",
+"SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY",
+and "OPTIONAL" are to be interpreted as described in BCP 14, RFC 2119 {{RFC2119}}.
+
+
+
+MPTCP timeout definition   {#define}
+------------------------
+
+There are different variances of multi-path timeout that could be exchanged.
+
+One may think of MPTCP timeout as the time elapsed since the last subflow
+of the connection closed, i.e. the duration that there is no subflow alive.
+However, two ends of a connection may have different views about the state
+of each subflow, due to TCP RST (or FIN-ACK?) packet loss. Moreover, a middlebox
+such as NAT may silently drop the subflow, 
+while one end or both ends think the subflow is still alive.
+It is necessary to implement an additional mechanism at the subflow level, e.g.
+TCP Keepalive to make sure the subflow is alive.
+This means that negotiating the no-subflow timeout between two ends is not enough
+to prevent the MPTCP session from timing out (use case 2) due to middleboxes.
+
+
+The alternative way is to exchange the MPTCP idle timeout (ITO), which is defined as the duration
+since the last TCP packet sent on any subflow of the MPTCP session. Relying on
+this value, MPTCP hosts do not need to worry about the middlebox interference
+or TCP RST (or FIN-ACK?) packet loss.
+
+Basic Operation   {#ops}
+========================
+
+The operation of MPTCP ITO option is similar to the TCP UTO option (defined in {{RFC5482}}).
+
+
+ITO Option and the local policy
+-------------------------------
+
+On receiving this option, the receiver MAY choose to accept this request.
+ In this case, SHOULD respond with the same value and notify the application about the new ITO.
+
+Alternatively, when it does not accept the requested value based on local policy,
+ it MAY choose to either respond with its own current value or it MAY ignore the request if it comes from an untrusted peer.
+
+When the initiator receives the ITO option with the same value, it SHOULD apply this same value to the connection.
+
+
+However, the exchange of MPTCP Idle Timeout Option is not a binding negotiation.
+A host may have a local policy that overrides the negotiated value, for example 
+when it needs to terminate long idle connection due to the increasing memory resource pressure.
+
+
+After the idle timeout fired, the host should move the connection state
+machine to close state, and report the timeout error to the user.
+
+
+ITO Option is Unreliable
+-------------------------
+
+MPTCP ITO Option does not require reliable handshaking, therefore, 
+implementations MUST NOT assume that it is transferred reliably.
+
+
+Option Format      {#format}
+--------------
+
+The specific format of the ITO option is depicted in Fig. {{figformat}}:
+
+Granularity (1 bit):
+:  Flag to indicate the time resolution.
+    When set (G = 1), the time value in "Idle Timeout" field 
+    MUST be interpreted as minutes. Otherwise (G = 0), the
+    "Idle Timeout" field MUST be interpreted as seconds.
+
+Idle Timeout (16 bits):
+  :  Specifies the requested Idle Timeout for the MPTCP session.
+    The granularity of this time value (minutes or seconds)
+    depends on the "G" field.
+
+~~~~~~~~~~
+                        1                   2                   3
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +---------------+---------------+-------+-------+---------------+
+   |     Kind      |  Length = 5   |Subtype|(rsv)|G|  Idle Timeout |
+   +---------------+---------------+-------+-------+---------------+
+   | Idle Timeout  |
+   +---------------+
+
+~~~~~~~~~~
+{: #figformat title="MPTCP Idle Timeout Option Format"}
+
+
+Alternatively, Experimental Multipath TCP option could be used but 
+it have a larger option size than the normal one.
+
+Implementation and Interoperability
+===================================
+
+Middleboxes
+-----------
+
+Interaction with Keepalives
+---------------------------
+
+On some MPTCP implementations like Linux, the TCP Keepalive is supported at the
+MPTCP layer. To implement the idle timeout option, these implementations
+may use the MPTCP KeepAliveTime value to keep track the current idle time. However,
+the idle timeout mechanism, when activated, should overwrite the keepalive mechanism.
+This means that after the idle timeout fired, the host should abort the connection
+instead of sending the TCP keepalives.
+
+MPTCP Idle Timeout Option MAY be controlled on a system-wide setting or 
+on a per-connection basis. Specific APIs and mechanisms for controlling the ITO option
+are out of the scope of this document.
+
+Security Considerations
+=======================
+
+On-path attackers may insert an MPTCP option into all observed sessions
+to increase the idle timeout to a very high value so that those un-closed
+sessions may accumulate on the host and exhaust the system resources.
+
+On the other hand, on-path attackers may try to reduce the idle timeout to
+a very low value (e.g. one second), so that any session that experiences
+a short idle duration would be dropped, effectively causes a type of DoS attack.
+
+To mitigate this attack, the hosts supporting this option SHOULD restrict
+the valid idle timeout value in a realistic range. The hosts MAY either cap
+the requested timeout value to the upper/lower threshold or just ignore it.
+
+Furthermore, the hosts could limit the numbers of the long idle sessions,
+and start shedding those ones with longest idle time when the system resources
+are under pressure.
+
+--- back
