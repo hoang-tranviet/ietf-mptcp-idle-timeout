@@ -1,8 +1,8 @@
 ---
-title: Multipath TCP Idle Timeout
-abbrev: mptcp-timeout
-docname: draft-hartke-xmpp-stupid-00
-date: 2009-07-05
+title: Multipath TCP Idle Lifetime Option
+abbrev: mptcp-idle-lifetime
+docname: draft-mptcp-idle-lifetime-00
+date: 2019-07-05
 category: info
 
 ipr: trust200902
@@ -15,21 +15,19 @@ pi: [toc, sortrefs, symrefs]
 
 author:
  -
-    ins: K. Hartke
-    name: Klaus Hartke
-    organization: U. catholique de Louvain
-    email: hartke@tzi.org
+    ins: V. Tran
+    name: Viet-Hoang Tran
+    organization: Universite catholique de Louvain
+    email: hoang.tran@uclouvain.be
  -
-    ins: C. Bormann
-    name: Carsten Bormann
-    org: U. catholique de Louvain
-    street: Postfach 330440
-    city: Bremen
-    code: D-28359
-    country: Germany
-    phone: +49-421-218-63921
-    facsimile: +49-421-218-7000
-    email: cabo@tzi.org
+    ins: O. Bonaventure
+    name: Olivier Bonaventure
+    organization: Universite catholique de Louvain
+    street: Pl. Ste Barbe, 2
+    city: Louvain-la-Neuve
+    code: 1348
+    country: Belgium
+    email: olivier.bonaventure@uclouvain.be
 
 normative:
   RFC2119:
@@ -40,7 +38,7 @@ informative:
 
 --- abstract
 
-This document discusses the idle timeout of MPTCP sessions,
+This document discusses the lifetime of idle MPTCP sessions,
 and defines an MPTCP Option subkind for hosts to announce and
 request this value.
 
@@ -53,21 +51,19 @@ Introduction        {#problems}
 {{I-D.ietf-mptcp-rfc6824bis}} defines the Multipath TCP.
 However, the lifetime of idle Multipath-level connections was barely discussed.
 
-There are several situations in which a host want to adjust the timeout.
-
+There are several situations in which a host want to adjust the idle lifetime.
 
 use case 1:
 
-: By reducing this timeout, a highly-loaded server can quickly
-terminate idle MPTCP connections. It can send an MPTCP option
-to signal its peers that the connections will be closed shortly.
-
+: A host that wants to extend the lifetime of a connection for the desired duration
+MAY request its peer to apply a high session timeout value. This is probably the main
+use case of using the idle lifetime option.
 
 use case 2:
 
-: On the other hand, requesting its peer a higher value allows a host
-to extend the lifetime of the connection for the desired duration.
-
+: On the other hand, by reducing this value, a highly-loaded server can quickly
+terminate currently unused MPTCP connections. It can send an MPTCP option
+to signal its peers that the connections will be closed shortly.
 
 
 
@@ -75,7 +71,8 @@ The Need for Standardization   {#need}
 ----------------------------
 
 An MPTCP-enabled host may have its own timing-out policy for idle sessions.
-However, in many cases, it is necessary to exchange the idle timeout value,
+However, in many cases, it is necessary to exchange the idle timeout value.
+The standard way to extend Multipath TCP is using MPTCP option,
 which requires the standardization.
 
 For regular TCP, extending the connection lifetime by increasing 
@@ -95,12 +92,15 @@ and "OPTIONAL" are to be interpreted as described in BCP 14, RFC 2119 {{RFC2119}
 
 
 
-MPTCP timeout definition   {#define}
-------------------------
+MPTCP session timeout definitions   {#define}
+---------------------------------
 
-There are different variances of multi-path timeout that could be exchanged.
+TODO: if we call it MPTCP (idle) session lifetime, it is easy to be confused with the
+total duration of a session since the establishment to the closure.
 
-One may think of MPTCP timeout as the time elapsed since the last subflow
+There are different variances of MPTCP session timeout that could be exchanged.
+
+One may think of MPTCP session timeout as the time elapsed since the last subflow
 of the connection closed, i.e. the duration that there is no subflow alive.
 However, two ends of a connection may have different views about the state
 of each subflow, due to TCP RST (or FIN-ACK?) packet loss. Moreover, a middlebox
@@ -109,11 +109,11 @@ while one end or both ends think the subflow is still alive.
 It is necessary to implement an additional mechanism at the subflow level, e.g.
 TCP Keepalive to make sure the subflow is alive.
 This means that negotiating the no-subflow timeout between two ends is not enough
-to prevent the MPTCP session from timing out (use case 2) due to middleboxes.
+to prevent the MPTCP session from timing out (use case 1) due to middleboxes.
 
 
 The alternative way is to exchange the MPTCP idle timeout (ITO), which is defined as the duration
-since the last TCP packet sent on any subflow of the MPTCP session. Relying on
+since the last valid TCP packet received on any subflow of the established MPTCP session. Relying on
 this value, MPTCP hosts do not need to worry about the middlebox interference
 or TCP RST (or FIN-ACK?) packet loss.
 
@@ -123,10 +123,10 @@ Basic Operation   {#ops}
 The operation of MPTCP ITO option is similar to the TCP UTO option (defined in {{RFC5482}}).
 
 
-ITO Option and the local policy
--------------------------------
+ITO Option and Local Policies
+-----------------------------
 
-On receiving this option, the receiver MAY choose to accept this request.
+Once receiving this option, the receiver MAY choose to accept this request.
  In this case, SHOULD respond with the same value and notify the application about the new ITO.
 
 Alternatively, when it does not accept the requested value based on local policy,
@@ -140,9 +140,13 @@ A host may have a local policy that overrides the negotiated value, for example
 when it needs to terminate long idle connection due to the increasing memory resource pressure.
 
 
-After the idle timeout fired, the host should move the connection state
-machine to close state, and report the timeout error to the user.
+After the idle timeout fired, the host MAY choose to forcfully close
+the MPTCP session with MPTCP_RST and all of its subflows with TCP_RST, and report the timeout error to the user.
+This is a common case on the servers, who want to free the resource occupied by unused sessions 
+as soon as possible so that they could serve other users.
 
+Alternatively, before and after the idle timeout fired, the host MAY send TCP Keepalive probes
+ if they want to reuse the current MPTCP session. This could be the case on client side.
 
 ITO Option is Unreliable
 -------------------------
@@ -171,7 +175,7 @@ Idle Timeout (16 bits):
                         1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
    +---------------+---------------+-------+-------+---------------+
-   |     Kind      |  Length = 5   |Subtype|(rsv)|G|  Idle Timeout |
+   |     Kind      |  Length = 5   |Subtype|G|(rsv)|  Idle Timeout |
    +---------------+---------------+-------+-------+---------------+
    | Idle Timeout  |
    +---------------+
@@ -189,8 +193,16 @@ Implementation and Interoperability
 Middleboxes
 -----------
 
+MPTCP-agnostic middleboxes are unlikely to selectively remove MPTCP ITO options.
+MPTCP-aware middleboxes may do that, though the motivation is unclear.
+The request initiator may send TCP Keepalive periodically on any subflow to maintain the session,
+or may re-establish the session when it detected the session was closed.
+
 Interaction with Keepalives
 ---------------------------
+
+The interaction of the idle session lifetime with subflow-level Keepalives is not yet specified.
+Note that with MPTCP enabled sessions, the subflow-level Keepalive is unlikely to be common. 
 
 On some MPTCP implementations like Linux, the TCP Keepalive is supported at the
 MPTCP layer. To implement the idle timeout option, these implementations
@@ -202,6 +214,13 @@ instead of sending the TCP keepalives.
 MPTCP Idle Timeout Option MAY be controlled on a system-wide setting or 
 on a per-connection basis. Specific APIs and mechanisms for controlling the ITO option
 are out of the scope of this document.
+
+Interaction with User Timeout
+-----------------------------
+
+The interaction of the idle session lifetime with MPTCP User Timeout is not yet specified.
+Should we do that?
+({{RFC5482}} infers that Keepalive time must be higher than UTO.)
 
 Security Considerations
 =======================
@@ -215,11 +234,11 @@ a very low value (e.g. one second), so that any session that experiences
 a short idle duration would be dropped, effectively causes a type of DoS attack.
 
 To mitigate this attack, the hosts supporting this option SHOULD restrict
-the valid idle timeout value in a realistic range. The hosts MAY either cap
+the valid idle timeout value in a safe range. The hosts MAY either cap
 the requested timeout value to the upper/lower threshold or just ignore it.
 
 Furthermore, the hosts could limit the numbers of the long idle sessions,
-and start shedding those ones with longest idle time when the system resources
-are under pressure.
+When the system resources are under pressure, it could start shedding those
+connections with longest idle time and from untrusted peers.
 
 --- back

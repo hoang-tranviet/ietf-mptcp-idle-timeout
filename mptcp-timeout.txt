@@ -2,18 +2,18 @@
 
 
 
-MPTCP Working Group                                            K. Hartke
-Internet-Draft                                                C. Bormann
-Intended status: Informational                  U. catholique de Louvain
-Expires: January 6, 2010                                   July 05, 2009
+MPTCP Working Group                                              V. Tran
+Internet-Draft                                            O. Bonaventure
+Intended status: Informational          Universite catholique de Louvain
+Expires: January 6, 2020                                   July 05, 2019
 
 
-                       Multipath TCP Idle Timeout
-                      draft-hartke-xmpp-stupid-00
+                   Multipath TCP Idle Lifetime Option
+                      draft-mptcp-idle-lifetime-00
 
 Abstract
 
-   This document discusses the idle timeout of MPTCP sessions, and
+   This document discusses the lifetime of idle MPTCP sessions, and
    defines an MPTCP Option subkind for hosts to announce and request
    this value.
 
@@ -25,23 +25,23 @@ Status of This Memo
    Internet-Drafts are working documents of the Internet Engineering
    Task Force (IETF).  Note that other groups may also distribute
    working documents as Internet-Drafts.  The list of current Internet-
-   Drafts is at http://datatracker.ietf.org/drafts/current/.
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
 
    Internet-Drafts are draft documents valid for a maximum of six months
    and may be updated, replaced, or obsoleted by other documents at any
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on January 6, 2010.
+   This Internet-Draft will expire on January 6, 2020.
 
 Copyright Notice
 
-   Copyright (c) 2009 IETF Trust and the persons identified as the
+   Copyright (c) 2019 IETF Trust and the persons identified as the
    document authors.  All rights reserved.
 
    This document is subject to BCP 78 and the IETF Trust's Legal
    Provisions Relating to IETF Documents
-   (http://trustee.ietf.org/license-info) in effect on the date of
+   (https://trustee.ietf.org/license-info) in effect on the date of
    publication of this document.  Please review these documents
    carefully, as they describe your rights and restrictions with respect
    to this document.  Code Components extracted from this document must
@@ -53,9 +53,9 @@ Copyright Notice
 
 
 
-Hartke & Bormann         Expires January 6, 2010                [Page 1]
+Tran & Bonaventure       Expires January 6, 2020                [Page 1]
 
-Internet-Draft                mptcp-timeout                    July 2009
+Internet-Draft             mptcp-idle-lifetime                 July 2019
 
 
 Table of Contents
@@ -63,17 +63,18 @@ Table of Contents
    1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   2
      1.1.  The Need for Standardization  . . . . . . . . . . . . . .   2
      1.2.  Terminology . . . . . . . . . . . . . . . . . . . . . . .   3
-     1.3.  MPTCP timeout definition  . . . . . . . . . . . . . . . .   3
+     1.3.  MPTCP session timeout definitions . . . . . . . . . . . .   3
    2.  Basic Operation . . . . . . . . . . . . . . . . . . . . . . .   3
-     2.1.  ITO Option and the local policy . . . . . . . . . . . . .   3
+     2.1.  ITO Option and Local Policies . . . . . . . . . . . . . .   4
      2.2.  ITO Option is Unreliable  . . . . . . . . . . . . . . . .   4
      2.3.  Option Format . . . . . . . . . . . . . . . . . . . . . .   4
    3.  Implementation and Interoperability . . . . . . . . . . . . .   5
      3.1.  Middleboxes . . . . . . . . . . . . . . . . . . . . . . .   5
      3.2.  Interaction with Keepalives . . . . . . . . . . . . . . .   5
-   4.  Security Considerations . . . . . . . . . . . . . . . . . . .   5
-   5.  References  . . . . . . . . . . . . . . . . . . . . . . . . .   5
-     5.1.  Normative References  . . . . . . . . . . . . . . . . . .   5
+     3.3.  Interaction with User Timeout . . . . . . . . . . . . . .   5
+   4.  Security Considerations . . . . . . . . . . . . . . . . . . .   6
+   5.  References  . . . . . . . . . . . . . . . . . . . . . . . . .   6
+     5.1.  Normative References  . . . . . . . . . . . . . . . . . .   6
      5.2.  Informative References  . . . . . . . . . . . . . . . . .   6
    Authors' Addresses  . . . . . . . . . . . . . . . . . . . . . . .   6
 
@@ -82,37 +83,39 @@ Table of Contents
    [I-D.ietf-mptcp-rfc6824bis] defines the Multipath TCP.  However, the
    lifetime of idle Multipath-level connections was barely discussed.
 
-   There are several situations in which a host want to adjust the
-   timeout.
+   There are several situations in which a host want to adjust the idle
+   lifetime.
 
-   use case 1:  By reducing this timeout, a highly-loaded server can
-      quickly terminate idle MPTCP connections.  It can send an MPTCP
-      option to signal its peers that the connections will be closed
-      shortly.
+   use case 1:  A host that wants to extend the lifetime of a connection
+      for the desired duration MAY request its peer to apply a high
+      session timeout value.  This is probably the main use case of
+      using the idle lifetime option.
 
-   use case 2:  On the other hand, requesting its peer a higher value
-      allows a host to extend the lifetime of the connection for the
-      desired duration.
+   use case 2:  On the other hand, by reducing this value, a highly-
+      loaded server can quickly terminate currently unused MPTCP
+      connections.  It can send an MPTCP option to signal its peers that
+      the connections will be closed shortly.
 
 1.1.  The Need for Standardization
 
    An MPTCP-enabled host may have its own timing-out policy for idle
    sessions.  However, in many cases, it is necessary to exchange the
-   idle timeout value, which requires the standardization.
+   idle timeout value.  The standard way to extend Multipath TCP is
+   using MPTCP option, which requires the standardization.
 
    For regular TCP, extending the connection lifetime by increasing the
    idle timeout value is usually not enough since it is common that the
+
+
+
+
+Tran & Bonaventure       Expires January 6, 2020                [Page 2]
+
+Internet-Draft             mptcp-idle-lifetime                 July 2019
+
+
    NAT/middleboxes on the path could explicitly or silently terminate
    the connection.
-
-
-
-
-
-Hartke & Bormann         Expires January 6, 2010                [Page 2]
-
-Internet-Draft                mptcp-timeout                    July 2009
-
 
    For Multipath TCP, this is a much lesser problem since the closure of
    one or all subflows do not terminate the multipath-level session.
@@ -124,37 +127,52 @@ Internet-Draft                mptcp-timeout                    July 2009
    and "OPTIONAL" are to be interpreted as described in BCP 14, RFC 2119
    [RFC2119].
 
-1.3.  MPTCP timeout definition
+1.3.  MPTCP session timeout definitions
 
-   There are different variances of multi-path timeout that could be
+   TODO: if we call it MPTCP (idle) session lifetime, it is easy to be
+   confused with the total duration of a session since the establishment
+   to the closure.
+
+   There are different variances of MPTCP session timeout that could be
    exchanged.
 
-   One may think of MPTCP timeout as the time elapsed since the last
-   subflow of the connection closed, i.e. the duration that there is no
-   subflow alive.  However, two ends of a connection may have different
-   views about the state of each subflow, due to TCP RST (or FIN-ACK?)
-   packet loss.  Moreover, a middlebox such as NAT may silently drop the
-   subflow, while one end or both ends think the subflow is still alive.
-   It is necessary to implement an additional mechanism at the subflow
-   level, e.g.  TCP Keepalive to make sure the subflow is alive.  This
-   means that negotiating the no-subflow timeout between two ends is not
-   enough to prevent the MPTCP session from timing out (use case 2) due
-   to middleboxes.
+   One may think of MPTCP session timeout as the time elapsed since the
+   last subflow of the connection closed, i.e. the duration that there
+   is no subflow alive.  However, two ends of a connection may have
+   different views about the state of each subflow, due to TCP RST (or
+   FIN-ACK?) packet loss.  Moreover, a middlebox such as NAT may
+   silently drop the subflow, while one end or both ends think the
+   subflow is still alive.  It is necessary to implement an additional
+   mechanism at the subflow level, e.g.  TCP Keepalive to make sure the
+   subflow is alive.  This means that negotiating the no-subflow timeout
+   between two ends is not enough to prevent the MPTCP session from
+   timing out (use case 1) due to middleboxes.
 
    The alternative way is to exchange the MPTCP idle timeout (ITO),
-   which is defined as the duration since the last TCP packet sent on
-   any subflow of the MPTCP session.  Relying on this value, MPTCP hosts
-   do not need to worry about the middlebox interference or TCP RST (or
-   FIN-ACK?) packet loss.
+   which is defined as the duration since the last valid TCP packet
+   received on any subflow of the established MPTCP session.  Relying on
+   this value, MPTCP hosts do not need to worry about the middlebox
+   interference or TCP RST (or FIN-ACK?) packet loss.
 
 2.  Basic Operation
 
    The operation of MPTCP ITO option is similar to the TCP UTO option
    (defined in [RFC5482]).
 
-2.1.  ITO Option and the local policy
 
-   On receiving this option, the receiver MAY choose to accept this
+
+
+
+
+
+Tran & Bonaventure       Expires January 6, 2020                [Page 3]
+
+Internet-Draft             mptcp-idle-lifetime                 July 2019
+
+
+2.1.  ITO Option and Local Policies
+
+   Once receiving this option, the receiver MAY choose to accept this
    request.  In this case, SHOULD respond with the same value and notify
    the application about the new ITO.
 
@@ -162,13 +180,6 @@ Internet-Draft                mptcp-timeout                    July 2009
    local policy, it MAY choose to either respond with its own current
    value or it MAY ignore the request if it comes from an untrusted
    peer.
-
-
-
-Hartke & Bormann         Expires January 6, 2010                [Page 3]
-
-Internet-Draft                mptcp-timeout                    July 2009
-
 
    When the initiator receives the ITO option with the same value, it
    SHOULD apply this same value to the connection.
@@ -178,9 +189,15 @@ Internet-Draft                mptcp-timeout                    July 2009
    negotiated value, for example when it needs to terminate long idle
    connection due to the increasing memory resource pressure.
 
-   After the idle timeout fired, the host should move the connection
-   state machine to close state, and report the timeout error to the
-   user.
+   After the idle timeout fired, the host MAY choose to forcfully close
+   the MPTCP session with MPTCP_RST and all of its subflows with
+   TCP_RST, and report the timeout error to the user.  This is a common
+   case on the servers, who want to free the resource occupied by unused
+   sessions as soon as possible so that they could serve other users.
+
+   Alternatively, before and after the idle timeout fired, the host MAY
+   send TCP Keepalive probes if they want to reuse the current MPTCP
+   session.  This could be the case on client side.
 
 2.2.  ITO Option is Unreliable
 
@@ -200,10 +217,19 @@ Internet-Draft                mptcp-timeout                    July 2009
       MPTCP session.  The granularity of this time value (minutes or
       seconds) depends on the "G" field.
 
+
+
+
+
+Tran & Bonaventure       Expires January 6, 2020                [Page 4]
+
+Internet-Draft             mptcp-idle-lifetime                 July 2019
+
+
                            1                   2                   3
        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
       +---------------+---------------+-------+-------+---------------+
-      |     Kind      |  Length = 5   |Subtype|(rsv)|G|  Idle Timeout |
+      |     Kind      |  Length = 5   |Subtype|G|(rsv)|  Idle Timeout |
       +---------------+---------------+-------+-------+---------------+
       | Idle Timeout  |
       +---------------+
@@ -214,23 +240,21 @@ Internet-Draft                mptcp-timeout                    July 2009
    Alternatively, Experimental Multipath TCP option could be used but it
    have a larger option size than the normal one.
 
-
-
-
-
-
-
-
-Hartke & Bormann         Expires January 6, 2010                [Page 4]
-
-Internet-Draft                mptcp-timeout                    July 2009
-
-
 3.  Implementation and Interoperability
 
 3.1.  Middleboxes
 
+   MPTCP-agnostic middleboxes are unlikely to selectively remove MPTCP
+   ITO options.  MPTCP-aware middleboxes may do that, though the
+   motivation is unclear.  The request initiator may send TCP Keepalive
+   periodically on any subflow to maintain the session, or may re-
+   establish the session when it detected the session was closed.
+
 3.2.  Interaction with Keepalives
+
+   The interaction of the idle session lifetime with subflow-level
+   Keepalives is not yet specified.  Note that with MPTCP enabled
+   sessions, the subflow-level Keepalive is unlikely to be common.
 
    On some MPTCP implementations like Linux, the TCP Keepalive is
    supported at the MPTCP layer.  To implement the idle timeout option,
@@ -243,6 +267,20 @@ Internet-Draft                mptcp-timeout                    July 2009
    MPTCP Idle Timeout Option MAY be controlled on a system-wide setting
    or on a per-connection basis.  Specific APIs and mechanisms for
    controlling the ITO option are out of the scope of this document.
+
+3.3.  Interaction with User Timeout
+
+   The interaction of the idle session lifetime with MPTCP User Timeout
+   is not yet specified.  Should we do that?  ([RFC5482] infers that
+   Keepalive time must be higher than UTO.)
+
+
+
+
+Tran & Bonaventure       Expires January 6, 2020                [Page 5]
+
+Internet-Draft             mptcp-idle-lifetime                 July 2019
+
 
 4.  Security Considerations
 
@@ -257,13 +295,14 @@ Internet-Draft                mptcp-timeout                    July 2009
    causes a type of DoS attack.
 
    To mitigate this attack, the hosts supporting this option SHOULD
-   restrict the valid idle timeout value in a realistic range.  The
-   hosts MAY either cap the requested timeout value to the upper/lower
-   threshold or just ignore it.
+   restrict the valid idle timeout value in a safe range.  The hosts MAY
+   either cap the requested timeout value to the upper/lower threshold
+   or just ignore it.
 
    Furthermore, the hosts could limit the numbers of the long idle
-   sessions, and start shedding those ones with longest idle time when
-   the system resources are under pressure.
+   sessions, When the system resources are under pressure, it could
+   start shedding those connections with longest idle time and from
+   untrusted peers.
 
 5.  References
 
@@ -273,14 +312,6 @@ Internet-Draft                mptcp-timeout                    July 2009
               Requirement Levels", BCP 14, RFC 2119,
               DOI 10.17487/RFC2119, March 1997,
               <https://www.rfc-editor.org/info/rfc2119>.
-
-
-
-
-Hartke & Bormann         Expires January 6, 2010                [Page 5]
-
-Internet-Draft                mptcp-timeout                    July 2009
-
 
 5.2.  Informative References
 
@@ -296,32 +327,30 @@ Internet-Draft                mptcp-timeout                    July 2009
 
 Authors' Addresses
 
-   Klaus Hartke
-   U. catholique de Louvain
-
-   Email: hartke@tzi.org
-
-
-   Carsten Bormann
-   U. catholique de Louvain
-   Postfach 330440
-   Bremen  D-28359
-   Germany
-
-   Phone: +49-421-218-63921
-   Fax:   +49-421-218-7000
-   Email: cabo@tzi.org
 
 
 
 
 
 
+Tran & Bonaventure       Expires January 6, 2020                [Page 6]
+
+Internet-Draft             mptcp-idle-lifetime                 July 2019
 
 
+   Viet-Hoang Tran
+   Universite catholique de Louvain
+
+   Email: hoang.tran@uclouvain.be
 
 
+   Olivier Bonaventure
+   Universite catholique de Louvain
+   Pl. Ste Barbe, 2
+   Louvain-la-Neuve  1348
+   Belgium
 
+   Email: olivier.bonaventure@uclouvain.be
 
 
 
@@ -333,4 +362,31 @@ Authors' Addresses
 
 
 
-Hartke & Bormann         Expires January 6, 2010                [Page 6]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Tran & Bonaventure       Expires January 6, 2020                [Page 7]

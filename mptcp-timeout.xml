@@ -9,33 +9,31 @@
 <?rfc sortrefs="yes"?>
 <?rfc symrefs="yes"?>
 
-<rfc ipr="trust200902" docName="draft-hartke-xmpp-stupid-00" category="info">
+<rfc ipr="trust200902" docName="draft-mptcp-idle-lifetime-00" category="info">
 
   <front>
-    <title abbrev="mptcp-timeout">Multipath TCP Idle Timeout</title>
+    <title abbrev="mptcp-idle-lifetime">Multipath TCP Idle Lifetime Option</title>
 
-    <author initials="K." surname="Hartke" fullname="Klaus Hartke">
-      <organization>U. catholique de Louvain</organization>
+    <author initials="V." surname="Tran" fullname="Viet-Hoang Tran">
+      <organization>Universite catholique de Louvain</organization>
       <address>
-        <email>hartke@tzi.org</email>
+        <email>hoang.tran@uclouvain.be</email>
       </address>
     </author>
-    <author initials="C." surname="Bormann" fullname="Carsten Bormann">
-      <organization>U. catholique de Louvain</organization>
+    <author initials="O." surname="Bonaventure" fullname="Olivier Bonaventure">
+      <organization>Universite catholique de Louvain</organization>
       <address>
         <postal>
-          <street>Postfach 330440</street>
-          <city>Bremen</city>
-          <code>D-28359</code>
-          <country>Germany</country>
+          <street>Pl. Ste Barbe, 2</street>
+          <city>Louvain-la-Neuve</city>
+          <code>1348</code>
+          <country>Belgium</country>
         </postal>
-        <phone>+49-421-218-63921</phone>
-        <facsimile>+49-421-218-7000</facsimile>
-        <email>cabo@tzi.org</email>
+        <email>olivier.bonaventure@uclouvain.be</email>
       </address>
     </author>
 
-    <date year="2009" month="July" day="05"/>
+    <date year="2019" month="July" day="05"/>
 
     <area>TSV</area>
     <workgroup>MPTCP Working Group</workgroup>
@@ -44,7 +42,7 @@
     <abstract>
 
 
-<t>This document discusses the idle timeout of MPTCP sessions,
+<t>This document discusses the lifetime of idle MPTCP sessions,
 and defines an MPTCP Option subkind for hosts to announce and
 request this value.</t>
 
@@ -63,22 +61,24 @@ request this value.</t>
 <t><xref target="I-D.ietf-mptcp-rfc6824bis"/> defines the Multipath TCP.
 However, the lifetime of idle Multipath-level connections was barely discussed.</t>
 
-<t>There are several situations in which a host want to adjust the timeout.</t>
+<t>There are several situations in which a host want to adjust the idle lifetime.</t>
 
 <t><list style="hanging">
   <t hangText='use case 1:'>
-  By reducing this timeout, a highly-loaded server can quickly
-terminate idle MPTCP connections. It can send an MPTCP option
-to signal its peers that the connections will be closed shortly.</t>
+  A host that wants to extend the lifetime of a connection for the desired duration
+MAY request its peer to apply a high session timeout value. This is probably the main
+use case of using the idle lifetime option.</t>
   <t hangText='use case 2:'>
-  On the other hand, requesting its peer a higher value allows a host
-to extend the lifetime of the connection for the desired duration.</t>
+  On the other hand, by reducing this value, a highly-loaded server can quickly
+terminate currently unused MPTCP connections. It can send an MPTCP option
+to signal its peers that the connections will be closed shortly.</t>
 </list></t>
 
 <section anchor="need" title="The Need for Standardization">
 
 <t>An MPTCP-enabled host may have its own timing-out policy for idle sessions.
-However, in many cases, it is necessary to exchange the idle timeout value,
+However, in many cases, it is necessary to exchange the idle timeout value.
+The standard way to extend Multipath TCP is using MPTCP option,
 which requires the standardization.</t>
 
 <t>For regular TCP, extending the connection lifetime by increasing 
@@ -96,11 +96,14 @@ of one or all subflows do not terminate the multipath-level session.</t>
 and “OPTIONAL” are to be interpreted as described in BCP 14, RFC 2119 <xref target="RFC2119"/>.</t>
 
 </section>
-<section anchor="define" title="MPTCP timeout definition">
+<section anchor="define" title="MPTCP session timeout definitions">
 
-<t>There are different variances of multi-path timeout that could be exchanged.</t>
+<t>TODO: if we call it MPTCP (idle) session lifetime, it is easy to be confused with the
+total duration of a session since the establishment to the closure.</t>
 
-<t>One may think of MPTCP timeout as the time elapsed since the last subflow
+<t>There are different variances of MPTCP session timeout that could be exchanged.</t>
+
+<t>One may think of MPTCP session timeout as the time elapsed since the last subflow
 of the connection closed, i.e. the duration that there is no subflow alive.
 However, two ends of a connection may have different views about the state
 of each subflow, due to TCP RST (or FIN-ACK?) packet loss. Moreover, a middlebox
@@ -109,10 +112,10 @@ while one end or both ends think the subflow is still alive.
 It is necessary to implement an additional mechanism at the subflow level, e.g.
 TCP Keepalive to make sure the subflow is alive.
 This means that negotiating the no-subflow timeout between two ends is not enough
-to prevent the MPTCP session from timing out (use case 2) due to middleboxes.</t>
+to prevent the MPTCP session from timing out (use case 1) due to middleboxes.</t>
 
 <t>The alternative way is to exchange the MPTCP idle timeout (ITO), which is defined as the duration
-since the last TCP packet sent on any subflow of the MPTCP session. Relying on
+since the last valid TCP packet received on any subflow of the established MPTCP session. Relying on
 this value, MPTCP hosts do not need to worry about the middlebox interference
 or TCP RST (or FIN-ACK?) packet loss.</t>
 
@@ -122,9 +125,9 @@ or TCP RST (or FIN-ACK?) packet loss.</t>
 
 <t>The operation of MPTCP ITO option is similar to the TCP UTO option (defined in <xref target="RFC5482"/>).</t>
 
-<section anchor="ito-option-and-the-local-policy" title="ITO Option and the local policy">
+<section anchor="ito-option-and-local-policies" title="ITO Option and Local Policies">
 
-<t>On receiving this option, the receiver MAY choose to accept this request.
+<t>Once receiving this option, the receiver MAY choose to accept this request.
  In this case, SHOULD respond with the same value and notify the application about the new ITO.</t>
 
 <t>Alternatively, when it does not accept the requested value based on local policy,
@@ -136,8 +139,13 @@ or TCP RST (or FIN-ACK?) packet loss.</t>
 A host may have a local policy that overrides the negotiated value, for example 
 when it needs to terminate long idle connection due to the increasing memory resource pressure.</t>
 
-<t>After the idle timeout fired, the host should move the connection state
-machine to close state, and report the timeout error to the user.</t>
+<t>After the idle timeout fired, the host MAY choose to forcfully close
+the MPTCP session with MPTCP_RST and all of its subflows with TCP_RST, and report the timeout error to the user.
+This is a common case on the servers, who want to free the resource occupied by unused sessions 
+as soon as possible so that they could serve other users.</t>
+
+<t>Alternatively, before and after the idle timeout fired, the host MAY send TCP Keepalive probes
+ if they want to reuse the current MPTCP session. This could be the case on client side.</t>
 
 </section>
 <section anchor="ito-option-is-unreliable" title="ITO Option is Unreliable">
@@ -166,7 +174,7 @@ implementations MUST NOT assume that it is transferred reliably.</t>
                         1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
    +---------------+---------------+-------+-------+---------------+
-   |     Kind      |  Length = 5   |Subtype|(rsv)|G|  Idle Timeout |
+   |     Kind      |  Length = 5   |Subtype|G|(rsv)|  Idle Timeout |
    +---------------+---------------+-------+-------+---------------+
    | Idle Timeout  |
    +---------------+
@@ -182,8 +190,16 @@ it have a larger option size than the normal one.</t>
 
 <section anchor="middleboxes" title="Middleboxes">
 
+<t>MPTCP-agnostic middleboxes are unlikely to selectively remove MPTCP ITO options.
+MPTCP-aware middleboxes may do that, though the motivation is unclear.
+The request initiator may send TCP Keepalive periodically on any subflow to maintain the session,
+or may re-establish the session when it detected the session was closed.</t>
+
 </section>
 <section anchor="interaction-with-keepalives" title="Interaction with Keepalives">
+
+<t>The interaction of the idle session lifetime with subflow-level Keepalives is not yet specified.
+Note that with MPTCP enabled sessions, the subflow-level Keepalive is unlikely to be common.</t>
 
 <t>On some MPTCP implementations like Linux, the TCP Keepalive is supported at the
 MPTCP layer. To implement the idle timeout option, these implementations
@@ -195,6 +211,13 @@ instead of sending the TCP keepalives.</t>
 <t>MPTCP Idle Timeout Option MAY be controlled on a system-wide setting or 
 on a per-connection basis. Specific APIs and mechanisms for controlling the ITO option
 are out of the scope of this document.</t>
+
+</section>
+<section anchor="interaction-with-user-timeout" title="Interaction with User Timeout">
+
+<t>The interaction of the idle session lifetime with MPTCP User Timeout is not yet specified.
+Should we do that?
+(<xref target="RFC5482"/> infers that Keepalive time must be higher than UTO.)</t>
 
 </section>
 </section>
@@ -209,12 +232,12 @@ a very low value (e.g. one second), so that any session that experiences
 a short idle duration would be dropped, effectively causes a type of DoS attack.</t>
 
 <t>To mitigate this attack, the hosts supporting this option SHOULD restrict
-the valid idle timeout value in a realistic range. The hosts MAY either cap
+the valid idle timeout value in a safe range. The hosts MAY either cap
 the requested timeout value to the upper/lower threshold or just ignore it.</t>
 
 <t>Furthermore, the hosts could limit the numbers of the long idle sessions,
-and start shedding those ones with longest idle time when the system resources
-are under pressure.</t>
+When the system resources are under pressure, it could start shedding those
+connections with longest idle time and from untrusted peers.</t>
 
 </section>
 
@@ -311,76 +334,87 @@ are under pressure.</t>
   </back>
 
 <!-- ##markdown-source:
-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
+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
 
 -->
 
