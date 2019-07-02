@@ -15,21 +15,19 @@ pi: [toc, sortrefs, symrefs]
 
 author:
  -
-    ins: K. Hartke
-    name: Klaus Hartke
-    organization: U. catholique de Louvain
-    email: hartke@tzi.org
+    ins: H. Viet
+    name: Hoang Tran Viet
+    organization: UCLouvain
+    city: Louvain-la-Neuve
+    country: Belgium
+    email: tranviet@uclouvain.be
  -
-    ins: C. Bormann
-    name: Carsten Bormann
-    org: U. catholique de Louvain
-    street: Postfach 330440
-    city: Bremen
-    code: D-28359
-    country: Germany
-    phone: +49-421-218-63921
-    facsimile: +49-421-218-7000
-    email: cabo@tzi.org
+    ins: O. Bonaventure
+    name: Olivier Bonaventure
+    org: UCLouvain
+    city: Louvain-la-Neuve
+    country: Belgium
+    email: olivier.bonaventure@uclouvain.be
 
 normative:
   RFC2119:
@@ -37,12 +35,11 @@ normative:
 informative:
   I-D.ietf-mptcp-rfc6824bis:
   RFC5482:
+  RFC8041:
 
 --- abstract
 
-This document discusses the idle timeout of MPTCP sessions,
-and defines an MPTCP Option subkind for hosts to announce and
-request this value.
+Hosts that support Multipath TCP need to maintain state for established connections, even if no subflow is active. Unforutnately, {{I-D.ietf-mptcp-rfc6824bis}} does not specify how long an implementation should maintain this state. This is problematic as idle Multipath TCP connections consumme state. We discuss this problem and propose a Multipath TCP option to communicate the maximum duration that a host will keep state for a Multipath TCP connection when all its underlying subflows are inactive.
 
 
 --- middle
@@ -50,8 +47,8 @@ request this value.
 Introduction        {#problems}
 ============
 
-{{I-D.ietf-mptcp-rfc6824bis}} defines the Multipath TCP.
-However, the lifetime of idle Multipath-level connections was barely discussed.
+Multipath TCP {{I-D.ietf-mptcp-rfc6824bis}} is now used for a wide range of use cases {{RFC8041}}. In many of these use cases, a Multipath TCP connection uses different subflows during the lifetime of the connections. In some deployment scenarios such as Hybrid Access Networks, these subflows are simultanesouly active. In other deployment scenarios, such as smartphones, these subflows are not active at the same time and one subflow is established after a failure of the previous one. In these smartphone scenarios, the Multipath TCP connection must remain active even if all its subflows have died to allow sufficient time to reestablish another subflow.
+
 
 There are several situations in which a host want to adjust the timeout.
 
