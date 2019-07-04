@@ -48,17 +48,17 @@ request this value.
 Introduction        {#problems}
 ============
 
-{{I-D.ietf-mptcp-rfc6824bis}} defines the Multipath TCP.
-However, the lifetime of idle Multipath-level connections was barely discussed.
+Multipath TCP {{RFC6824}} {{I-D.ietf-mptcp-rfc6824bis}} is used in various use cases {{RFC8040}}. In several of these deployments, a Multipath TCP connection is composed of a number of subflows that varies during the lifetime of the connection.
+TCP implementations create state when a connection starts and maintain this state until the abrupt or graceful termination of the connection according to the TCP state machine {{RFC793}}. Multipath TCP implementations need to maintain two types of states :
 
+ - the per-Multipath TCP connection state that includes the connection keys, data sequence numbers, ...
+ - the per-TCP subflows connection states
+ 
+The per-TCP state of each subflow is managed according to {{RFC793}}. The Multipath TCP connection state also needs to be managed. We consider a subflow to be active if its TCP state machine exists and is in the Established state.  We call inactive a Multipath TCP connection that currently has no active subflow. It is important to note that it is possible for one host to consider a given Multipath TCP connection to be inactive while the other endpoint considers that the connection is still active. This can happen for example when some packets are lost or when one of the hosts has received a spurious RST on the only active subflow. {{RFC6824}} and {{I-D.ietf-mptcp-rfc6824bis}} specify how this state can be removed upon transmission or reception of a FAST_CLOSE and after having exchanged DATA_FINs. However, {{RFC6824}} and {{I-D.ietf-mptcp-rfc6824bis}} do not specify precisely how the Multipath TCP connection state must be managed when all the TCP subflows associated to this Multipath TCP connection have been released. A similar problem existed in TCP for idle connections. It was clarified in {{RFC1122}}.
 
-We consider a subflow to be active if its TCP state machine exists and is in the Established state.  We call inactive a Multipath TCP connection that currently has no active subflow. It is important to note that it is possible for one host to consider a given Multipath TCP connection to be inactive while the other endpoint considers that the connection is still active. This can happen for example when some packets are lost or when one of the hosts has received a spurious RST on the only active subflow. 
-
-Given the cost of maintaining state for inactive Multipath TCP connections, hosts may want to limit the time during which they maintain state for inactive Multipath TCP connections. Neither {{RFC6824}} nor {{I-D.ietf-mptcp-rfc6824bis}} propose a default duration to maintain this state. We fill this gap in this document and also propose a Multipath TCP option that enables hosts to agree on a common minimum duration to maintain inactive Multipath TCP connections.
+Given the cost of maintaining state for inactive Multipath TCP connections, hosts may want to limit the time during which they maintain state for inactive Multipath TCP connections. Neither {{RFC6824}} nor {{I-D.ietf-mptcp-rfc6824bis}} propose a default duration to maintain this state. Although some applications such as http/1.1 include a mechanism to terminate idle connections, many applications do not do this. We fill this gap in this document and propose a Multipath TCP option that enables hosts to agree on a common minimum duration to maintain inactive Multipath TCP connections.
 
 This document is organised as follows. 
-
-
 
 
 Terminology          {#Terminology}
@@ -82,158 +82,79 @@ There are several types of events which can occur during the lifetime of a Multi
  
 To support the establishment of a new subflow with the MP_JOIN option, a host must maintain state for all established Multipath TCP connection. Neither {{RFC6824}} nor {{I-D.ietf-mptcp-rfc6824bis}} specify how a host should behave upon (graceful or abrupt) termination of the last subflow associated to an existing Multipath TCP connection. One possibility would be to consider that since no subflow is associated with this connection, its state could be freed. A consequence of this policy is that it would then be impossible to establish a new subflow to this connection to recover from the failure of the previous one. Another possibility is to preserve the state of this Multipath TCP connection for some period of time. This would better match the expectations of mobile use cases where subflows can fail abruptly when devices move.
 
-This document proposes the utilisation of an Inactivity timer in Multipath TCP implementations. This timer bounds the time during which there is no active subflow associated to a given Multipath TCP connection. It starts when the last active subflow associated to a connection is terminated. It is reset when one active subflow is associated to this Multipath TCP connection. It can be used in two modes :
-
- - probe 
- - terminate
+This document proposes the utilisation of an Inactivity timer in Multipath TCP implementations. This timer bounds the time during which there is no active subflow associated to a given Multipath TCP connection. It starts when the last active subflow associated to a connection is terminated. It is reset when one active subflow is associated to this Multipath TCP connection. Upon expiration of this timer, the host SHOULD remove state for the associated Multipath TCP connection. If a host wants to maintain a Multipath TCP connection as active, it SHOULD try to reestablish a subflow associated to this Multipath TCP connection before the expiration of its inactivity timer. This document suggests to start the reestablishment of such a subflow after half the Inactivity timer. 
  
-In "terminate" mode, the timer removes the state associated to the connection when it expires. In "probe" mode, when the timer expires, the host tries to establish one subflow over this Multipath TCP connection.  
 
-We expect that the probe mode will mainly be used by hosts that create subflows such as clients will the terminate mode will be used by hosts that mainly accept subflows such as servers.
-
-TO be discussed :
-
-There are different variances of MPTCP session timeout that could be exchanged.
-
-One may think of MPTCP session timeout as the time elapsed since the last subflow
-of the connection closed, i.e. the duration that there is no subflow alive.
-However, two ends of a connection may have different views about the state
-of each subflow, due to TCP RST (or FIN-ACK?) packet loss. Moreover, a middlebox
-such as NAT may silently drop the subflow, 
-while one end or both ends think the subflow is still alive.
-It is necessary to implement an additional mechanism at the subflow level, e.g.
-TCP Keepalive to make sure the subflow is alive.
-This means that negotiating the no-subflow timeout between two ends is not enough
-to prevent the MPTCP session from timing out (use case 1) due to middleboxes.
-
-
-The alternative way is to exchange the MPTCP inactive timeout (ITO), which is defined as the duration
-since the last valid TCP packet received on any subflow of the established MPTCP session. Relying on
-this value, MPTCP hosts do not need to worry about the middlebox interference
-or TCP RST (or FIN-ACK?) packet loss.
-
-The Multipath TCP Inactive Timeout Option   {#ops}
+The Multipath TCP Inactivity Timer Option   {#ops}
 =========================================
 
-The Multipath TCP Inactive Timeout Option (MPTCP ITO) is used to exchanged the suggested value for the Inactive  option is similar to the TCP UTO option defined in {{RFC5482}}).
-
-
-ITO Option and Local Policies
------------------------------
-
-Once receiving this option, the receiver MAY choose to accept this request.
-In this case, it SHOULD respond with the same value and notify the application about the new ITO.
-
-Alternatively, when it does not accept the requested value based on local policy,
- it MAY choose to either respond with its own current value or it MAY ignore the request if it comes from an untrusted peer.
-
-When the initiator receives the ITO option with the same value, it SHOULD apply this same value to the connection.
-
-
-However, the exchange of MPTCP Idle Timeout Option is not a binding negotiation.
-A host may have a local policy that overrides the negotiated value, for example 
-when it needs to terminate long idle connection due to the increasing memory resource pressure.
-
-
-After the idle timeout fired, the host MAY choose to forcfully close
-the MPTCP session with MPTCP_RST and all of its subflows with TCP_RST, and report the timeout error to the user.
-This is a common case on the servers, who want to free the resource occupied by unused sessions 
-as soon as possible so that they could serve other users.
-
-Alternatively, before and after the idle timeout fired, the host MAY send TCP Keepalive probes
- if they want to reuse the current MPTCP session. This could be the case on client side.
-
-ITO Option is Unreliable
--------------------------
-
-MPTCP ITO Option does not require reliable handshaking, therefore, 
-implementations MUST NOT assume that it is transferred reliably.
+The Multipath TCP Inactivity Timer Option (MPTCP ITO) is used to exchange the Inactivivity Timer associated to this connection. This documents recommends a default value of 2 hours as discussed in {{RFC1122}}. 
 
 
 Option Format      {#format}
 --------------
 
-The specific format of the ITO option is depicted in Fig. {{figformat}}:
-
-Granularity (1 bit):
-:  Flag to indicate the time resolution.
-    When set (G = 1), the time value in "Idle Timeout" field 
-    MUST be interpreted as minutes. Otherwise (G = 0), the
-    "Idle Timeout" field MUST be interpreted as seconds.
-
-Idle Timeout (16 bits):
-  :  Specifies the requested Idle Timeout for the MPTCP session.
-    The granularity of this time value (minutes or seconds)
-    depends on the "G" field.
+The format of the ITO option is depicted in Fig. {{figformat}}:
 
 ~~~~~~~~~~
                         1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
    +---------------+---------------+-------+-------+---------------+
-   |     Kind      |  Length = 5   |Subtype|G|(rsv)|  Idle Timeout |
+   |     Kind      |  Length = 5   |Subtype| (rsv) |   Inactivity  |
    +---------------+---------------+-------+-------+---------------+
-   | Idle Timeout  |
+   |     Timer     |
    +---------------+
 
 ~~~~~~~~~~
-{: #figformat title="MPTCP Idle Timeout Option Format"}
+{: #figformat title="MPTCP Inactivity Timer Option Format"}
 
+In the ITO option, the Inactivity Timer (16 bits) specifies the requested Timer for the MPTCP session in seconds. A value of zero indicates that the state for the Multipath TCP connection will be removed as soon as there is no active subflow.
 
-Alternatively, Experimental Multipath TCP option could be used but 
-it have a larger option size than the normal one.
+ITO Option and Local Policies
+-----------------------------
+
+The ITO option is used to specify the value of the Inactivity timer associated to the connection by the host that sends the option. Upon reception of this option, the receiver MAY choose to transmit its own ITO option. A host MAY decide to update its ITO option based on the ITO option received from its peer. Note that the ITO option is an indicative value.  A host may need  to terminate long inactive connections before the expiration of the ITO timer due to the increasing memory resource pressure.
+
+Like all Multipath TCP options, the ITO Option is exchanged without any protection from TCP's reliability mechanisms.  Therefore, implementations MUST NOT assume that it is transferred reliably. Implementations that use the ITO option can transmit the ITO option at any time. Since the utilisation of this option is not negotiated during the connection handshake, a host MUST NOT send more than three ITO options on a connection where it has not received any ITO option.
+
+After the expiration of the Inactivity timer, the host MAY choose to close the MPTCP session with MPTCP_RST and all of its subflows with TCP_RST, and report the inactivity timeout error to the user. This is a common case on the servers that want to free the resource occupied by unused sessions as soon as possible so that they could serve other users.
+
 
 Implementation and Interoperability
 ===================================
 
-Middleboxes
------------
+Interaction with TCP Keepalives
+-------------------------------
 
-MPTCP-agnostic middleboxes are unlikely to selectively remove MPTCP ITO options.
-MPTCP-aware middleboxes may do that, though the motivation is unclear.
-The request initiator may send TCP Keepalive periodically on any subflow to maintain the session,
-or may re-establish the session when it detected the session was closed.
-
-Interaction with Keepalives
----------------------------
-
-The interaction of the idle session lifetime with subflow-level Keepalives is not yet specified.
-Note that with MPTCP enabled sessions, the subflow-level Keepalive is unlikely to be common. 
+The mechanism specified in this document operates above the TCP Keepalives defined in {{RFC1122}}. If TCP Keepalives are enabled on at least one of the subflows of a Multipath TCP connection, then this subflow will remain active and the Inactivity timer of the associated Multipath TCP connection will not expire. In this case, the Inactivity timer should be longer than the TCP Keepalive timer. If TCP Keepalives are disabled, then the mechanism described in this document will remove the state of the inactive connections.
 
 On some MPTCP implementations like Linux, the TCP Keepalive is supported at the
 MPTCP layer. To implement the idle timeout option, these implementations
-may use the MPTCP KeepAliveTime value to keep track the current idle time. However,
+may use the MPTCP KeepAliveTime value to keep track of the current idle time. However,
 the idle timeout mechanism, when activated, should overwrite the keepalive mechanism.
 This means that after the idle timeout fired, the host should abort the connection
 instead of sending the TCP keepalives.
 
-MPTCP Idle Timeout Option MAY be controlled on a system-wide setting or 
+The MPTCP Inactivity Timer Option MAY be controlled on a system-wide setting or 
 on a per-connection basis. Specific APIs and mechanisms for controlling the ITO option
 are out of the scope of this document.
 
 Interaction with User Timeout
 -----------------------------
 
-The interaction of the idle session lifetime with MPTCP User Timeout is not yet specified.
-Should we do that?
-({{RFC5482}} infers that Keepalive time must be higher than UTO.)
+The interactions between the User Timeout option {{RFC5482}} and the ITO option will be discussed in a subsequent revision of this document.  
 
 Security Considerations
 =======================
 
-On-path attackers may insert an MPTCP option into all observed sessions
-to increase the idle timeout to a very high value so that those un-closed
-sessions may accumulate on the host and exhaust the system resources.
+The ITO option enables hosts to exchange the value of a timer that protects against some types of ressource exhaustion attacks. Multipath TCP implementations should define a range of safe values for the ITO option and prevent applications from configuring an inactivity timer outside this range. They should also ignore received ITO options that are outside this range.
 
-On the other hand, on-path attackers may try to reduce the idle timeout to
-a very low value (e.g. one second), so that any session that experiences
-a short idle duration would be dropped, effectively causes a type of DoS attack.
+Since the ITO option is neither encrypted nor authenticated, on-path attackers and middleboxes could remove, add or modify the ITO option on observed Multipath TCP connections. 
 
-To mitigate this attack, the hosts supporting this option SHOULD restrict
-the valid idle timeout value in a safe range. The hosts MAY either cap
-the requested timeout value to the upper/lower threshold or just ignore it.
+IANA Considerations
+===================
 
-Furthermore, the hosts could limit the numbers of the long idle sessions,
-When the system resources are under pressure, it could start shedding those
-connections with longest idle time and from untrusted peers.
+
+IANA is requested to assign a MPTCP option subtype for the ITO option from the "MPTCP Option Subtypes" available at https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml
 
 --- back
