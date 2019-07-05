@@ -58,36 +58,19 @@ request this value.</t>
 
 <section anchor="problems" title="Introduction">
 
-<t><xref target="I-D.ietf-mptcp-rfc6824bis"/> defines the Multipath TCP.
-However, the lifetime of idle Multipath-level connections was barely discussed.</t>
+<t>Multipath TCP <xref target="RFC6824"/> <xref target="I-D.ietf-mptcp-rfc6824bis"/> is used in various use cases <xref target="RFC8040"/>. In several of these deployments, a Multipath TCP connection is composed of a number of subflows that varies during the lifetime of the connection.
+TCP implementations create state when a connection starts and maintain this state until the abrupt or graceful termination of the connection according to the TCP state machine <xref target="RFC0793"/>. Multipath TCP implementations need to maintain two types of states:</t>
 
-<t>There are several situations in which a host want to adjust the idle lifetime.</t>
-
-<t><list style="hanging">
-  <t hangText='use case 1:'>
-  A host that wants to extend the lifetime of a connection for the desired duration
-MAY request its peer to apply a high session timeout value. This is probably the main
-use case of using the idle lifetime option.</t>
-  <t hangText='use case 2:'>
-  On the other hand, by reducing this value, a highly-loaded server can quickly
-terminate currently unused MPTCP connections. It can send an MPTCP option
-to signal its peers that the connections will be closed shortly.</t>
+<t><list style="symbols">
+  <t>the per-Multipath TCP connection state that includes the connection keys, data sequence numbers, …</t>
+  <t>the per-TCP subflows connection states</t>
 </list></t>
 
-<section anchor="need" title="The Need for Standardization">
+<t>The per-TCP state of each subflow is managed according to <xref target="RFC0793"/>. The Multipath TCP connection state also needs to be managed. We consider a subflow to be active if its TCP state machine exists and is in the Established state.  We call inactive a Multipath TCP connection that currently has no active subflow. It is important to note that it is possible for one host to consider a given Multipath TCP connection to be inactive while the other endpoint considers that the connection is still active. This can happen for example when some packets are lost or when one of the hosts has received a spurious RST on the only active subflow. <xref target="RFC6824"/> and <xref target="I-D.ietf-mptcp-rfc6824bis"/> specify how this state can be removed upon transmission or reception of a FAST_CLOSE and after having exchanged DATA_FINs. However, <xref target="RFC6824"/> and <xref target="I-D.ietf-mptcp-rfc6824bis"/> do not specify precisely how the Multipath TCP connection state must be managed when all the TCP subflows associated to this Multipath TCP connection have been released. A similar problem existed in TCP for idle connections. It was clarified in <xref target="RFC1122"/>.</t>
 
-<t>An MPTCP-enabled host may have its own timing-out policy for idle sessions.
-However, in many cases, it is necessary to exchange the idle timeout value.
-The standard way to extend Multipath TCP is using MPTCP option,
-which requires the standardization.</t>
+<t>Given the cost of maintaining state for inactive Multipath TCP connections, hosts may want to limit the time during which they maintain state for inactive Multipath TCP connections. Neither <xref target="RFC6824"/> nor <xref target="I-D.ietf-mptcp-rfc6824bis"/> propose a default duration to maintain this state. Although some applications such as http/1.1 include a mechanism to terminate idle connections, many applications do not do this. We fill this gap in this document and propose a Multipath TCP option that enables hosts to agree on a common minimum duration to maintain inactive Multipath TCP connections.</t>
 
-<t>For regular TCP, extending the connection lifetime by increasing 
-the idle timeout value is usually not enough since it is common 
-that the NAT/middleboxes on the path could explicitly or silently
-terminate the connection.</t>
-
-<t>For Multipath TCP, this is a much lesser problem since the closure
-of one or all subflows do not terminate the multipath-level session.</t>
+<t>This document is organised as follows.</t>
 
 </section>
 <section anchor="Terminology" title="Terminology">
@@ -96,148 +79,84 @@ of one or all subflows do not terminate the multipath-level session.</t>
 and “OPTIONAL” are to be interpreted as described in BCP 14, RFC 2119 <xref target="RFC2119"/>.</t>
 
 </section>
-<section anchor="define" title="MPTCP session timeout definitions">
+<section anchor="define" title="Lifetime of Multipath TCP connections">
 
-<t>TODO: if we call it MPTCP (idle) session lifetime, it is easy to be confused with the
-total duration of a session since the establishment to the closure.</t>
+<t>A Multipath TCP connection starts with a three-way-handshake that uses the MP_CAPABLE option and ends with either the transmission of DATA_FINs or a FAST_CLOSE. Between these two events, the number of subflows that compose the connection may vary and during some periods of time, it is possible that no active subflow is associated to an existing Multipath TCP connection.</t>
 
-<t>There are different variances of MPTCP session timeout that could be exchanged.</t>
+<t>There are several types of events which can occur during the lifetime of a Multipath TCP connection:</t>
 
-<t>One may think of MPTCP session timeout as the time elapsed since the last subflow
-of the connection closed, i.e. the duration that there is no subflow alive.
-However, two ends of a connection may have different views about the state
-of each subflow, due to TCP RST (or FIN-ACK?) packet loss. Moreover, a middlebox
-such as NAT may silently drop the subflow, 
-while one end or both ends think the subflow is still alive.
-It is necessary to implement an additional mechanism at the subflow level, e.g.
-TCP Keepalive to make sure the subflow is alive.
-This means that negotiating the no-subflow timeout between two ends is not enough
-to prevent the MPTCP session from timing out (use case 1) due to middleboxes.</t>
-
-<t>The alternative way is to exchange the MPTCP idle timeout (ITO), which is defined as the duration
-since the last valid TCP packet received on any subflow of the established MPTCP session. Relying on
-this value, MPTCP hosts do not need to worry about the middlebox interference
-or TCP RST (or FIN-ACK?) packet loss.</t>
-
-</section>
-</section>
-<section anchor="ops" title="Basic Operation">
-
-<t>The operation of MPTCP ITO option is similar to the TCP UTO option (defined in <xref target="RFC5482"/>).</t>
-
-<section anchor="ito-option-and-local-policies" title="ITO Option and Local Policies">
-
-<t>Once receiving this option, the receiver MAY choose to accept this request.
- In this case, SHOULD respond with the same value and notify the application about the new ITO.</t>
-
-<t>Alternatively, when it does not accept the requested value based on local policy,
- it MAY choose to either respond with its own current value or it MAY ignore the request if it comes from an untrusted peer.</t>
-
-<t>When the initiator receives the ITO option with the same value, it SHOULD apply this same value to the connection.</t>
-
-<t>However, the exchange of MPTCP Idle Timeout Option is not a binding negotiation.
-A host may have a local policy that overrides the negotiated value, for example 
-when it needs to terminate long idle connection due to the increasing memory resource pressure.</t>
-
-<t>After the idle timeout fired, the host MAY choose to forcfully close
-the MPTCP session with MPTCP_RST and all of its subflows with TCP_RST, and report the timeout error to the user.
-This is a common case on the servers, who want to free the resource occupied by unused sessions 
-as soon as possible so that they could serve other users.</t>
-
-<t>Alternatively, before and after the idle timeout fired, the host MAY send TCP Keepalive probes
- if they want to reuse the current MPTCP session. This could be the case on client side.</t>
-
-</section>
-<section anchor="ito-option-is-unreliable" title="ITO Option is Unreliable">
-
-<t>MPTCP ITO Option does not require reliable handshaking, therefore, 
-implementations MUST NOT assume that it is transferred reliably.</t>
-
-</section>
-<section anchor="format" title="Option Format">
-
-<t>The specific format of the ITO option is depicted in Fig. <xref target="figformat"/>:</t>
-
-<t><list style="hanging">
-  <t hangText='Granularity (1 bit):'>
-  Flag to indicate the time resolution.
- When set (G = 1), the time value in “Idle Timeout” field 
- MUST be interpreted as minutes. Otherwise (G = 0), the
- “Idle Timeout” field MUST be interpreted as seconds.</t>
-  <t hangText='Idle Timeout (16 bits):'>
-  Specifies the requested Idle Timeout for the MPTCP session.
-    The granularity of this time value (minutes or seconds)
-    depends on the “G” field.</t>
+<t><list style="symbols">
+  <t>establishment of a new subflow</t>
+  <t>graceful termination of subflow with the exchange of FINs</t>
+  <t>abrupt termination of a subflow due to multiple expirations of its retransmission timer, the reception of a RST or an abnormal packet, …</t>
 </list></t>
 
-<figure title="MPTCP Idle Timeout Option Format" anchor="figformat"><artwork><![CDATA[
+<t>To support the establishment of a new subflow with the MP_JOIN option, a host must maintain state for all established Multipath TCP connection. Neither <xref target="RFC6824"/> nor <xref target="I-D.ietf-mptcp-rfc6824bis"/> specify how a host should behave upon (graceful or abrupt) termination of the last subflow associated to an existing Multipath TCP connection. One possibility would be to consider that since no subflow is associated with this connection, its state could be freed. A consequence of this policy is that it would then be impossible to establish a new subflow to this connection to recover from the failure of the previous one. Another possibility is to preserve the state of this Multipath TCP connection for some period of time. This would better match the expectations of mobile use cases where subflows can fail abruptly when devices move.</t>
+
+<t>This document proposes the utilisation of an Inactivity timer in Multipath TCP implementations. This timer bounds the time during which there is no active subflow associated to a given Multipath TCP connection. It starts when the last active subflow associated to a connection is terminated. It is reset when one active subflow is associated to this Multipath TCP connection. Upon expiration of this timer, the host SHOULD remove state for the associated Multipath TCP connection. If a host wants to maintain a Multipath TCP connection as active, it SHOULD try to reestablish a subflow associated to this Multipath TCP connection before the expiration of its inactivity timer. This document suggests to start the reestablishment of such a subflow after half the Inactivity timer.</t>
+
+</section>
+<section anchor="ops" title="The Multipath TCP Inactivity Timer Option">
+
+<t>The Multipath TCP Inactivity Timer Option (MPTCP ITO) is used to exchange the Inactivivity Timer associated to this connection. This documents recommends a default value of 2 hours as discussed in <xref target="RFC1122"/>.</t>
+
+<section anchor="format" title="Option Format">
+
+<t>The format of the ITO option is depicted in Fig. <xref target="figformat"/>:</t>
+
+<figure title="MPTCP Inactivity Timer Option Format" anchor="figformat"><artwork><![CDATA[
                         1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
    +---------------+---------------+-------+-------+---------------+
-   |     Kind      |  Length = 5   |Subtype|G|(rsv)|  Idle Timeout |
+   |     Kind      |  Length = 5   |Subtype| (rsv) |   Inactivity  |
    +---------------+---------------+-------+-------+---------------+
-   | Idle Timeout  |
+   |     Timer     |
    +---------------+
 
 ]]></artwork></figure>
 
-<t>Alternatively, Experimental Multipath TCP option could be used but 
-it have a larger option size than the normal one.</t>
+<t>In the ITO option, the Inactivity Timer (16 bits) specifies the requested Timer for the MPTCP session in seconds. A value of zero indicates that the state for the Multipath TCP connection will be removed as soon as there is no active subflow.</t>
+
+</section>
+<section anchor="ito-option-and-local-policies" title="ITO Option and Local Policies">
+
+<t>The ITO option is used to specify the value of the Inactivity timer associated to the connection by the host that sends the option. Upon reception of this option, the receiver MAY choose to transmit its own ITO option. A host MAY decide to update its ITO option based on the ITO option received from its peer. Note that the ITO option is an indicative value.  A host may terminate long inactive connections before the expiration of the ITO timer due to the increasing memory resource pressure.</t>
+
+<t>Like all Multipath TCP options, the ITO Option is exchanged without any protection from TCP’s reliability mechanisms.  Therefore, implementations MUST NOT assume that it is transferred reliably. Implementations that use the ITO option can transmit the ITO option at any time. Since the utilisation of this option is not negotiated during the connection handshake, a host MUST NOT send more than three ITO options on a connection where it has not received any ITO option.</t>
+
+<t>After the expiration of the Inactivity timer, the host MAY choose to close the MPTCP session with MPTCP_RST and all of its subflows with TCP_RST, and report the inactivity timeout error to the user. This is a common case on the servers that want to free the resource occupied by unused sessions as soon as possible so that they could serve other users.</t>
 
 </section>
 </section>
 <section anchor="implementation-and-interoperability" title="Implementation and Interoperability">
 
-<section anchor="middleboxes" title="Middleboxes">
+<section anchor="interaction-with-tcp-keepalives" title="Interaction with TCP Keepalives">
 
-<t>MPTCP-agnostic middleboxes are unlikely to selectively remove MPTCP ITO options.
-MPTCP-aware middleboxes may do that, though the motivation is unclear.
-The request initiator may send TCP Keepalive periodically on any subflow to maintain the session,
-or may re-establish the session when it detected the session was closed.</t>
-
-</section>
-<section anchor="interaction-with-keepalives" title="Interaction with Keepalives">
-
-<t>The interaction of the idle session lifetime with subflow-level Keepalives is not yet specified.
-Note that with MPTCP enabled sessions, the subflow-level Keepalive is unlikely to be common.</t>
+<t>The mechanism specified in this document operates above the TCP Keepalives defined in <xref target="RFC1122"/>. If TCP Keepalives are enabled on at least one of the subflows of a Multipath TCP connection, then this subflow will remain active and the Inactivity timer of the associated Multipath TCP connection will not expire. In this case, the Inactivity timer should be longer than the TCP Keepalive timer. If TCP Keepalives are disabled, then the mechanism described in this document will remove the state of the inactive connections.</t>
 
 <t>On some MPTCP implementations like Linux, the TCP Keepalive is supported at the
 MPTCP layer. To implement the idle timeout option, these implementations
-may use the MPTCP KeepAliveTime value to keep track the current idle time. However,
-the idle timeout mechanism, when activated, should overwrite the keepalive mechanism.
-This means that after the idle timeout fired, the host should abort the connection
-instead of sending the TCP keepalives.</t>
+may use the MPTCP KeepAliveTime value to keep track of the current idle time. However, the idle timeout mechanism, when activated, should override the keepalive mechanism. This means that after the idle timeout fired, the host should abort the connection instead of sending the TCP keepalives.</t>
 
-<t>MPTCP Idle Timeout Option MAY be controlled on a system-wide setting or 
-on a per-connection basis. Specific APIs and mechanisms for controlling the ITO option
-are out of the scope of this document.</t>
+<t>The MPTCP Inactivity Timer Option MAY be controlled on a system-wide setting or on a per-connection basis. Specific APIs and mechanisms for controlling the ITO option are out of the scope of this document.</t>
 
 </section>
 <section anchor="interaction-with-user-timeout" title="Interaction with User Timeout">
 
-<t>The interaction of the idle session lifetime with MPTCP User Timeout is not yet specified.
-Should we do that?
-(<xref target="RFC5482"/> infers that Keepalive time must be higher than UTO.)</t>
+<t>The interactions between the User Timeout option <xref target="RFC5482"/> and the ITO option will be discussed in a subsequent revision of this document.</t>
 
 </section>
 </section>
 <section anchor="security-considerations" title="Security Considerations">
 
-<t>On-path attackers may insert an MPTCP option into all observed sessions
-to increase the idle timeout to a very high value so that those un-closed
-sessions may accumulate on the host and exhaust the system resources.</t>
+<t>The ITO option enables hosts to exchange the value of a timer that protects against some types of ressource exhaustion attacks. Multipath TCP implementations should define a range of safe values for the ITO option and prevent applications from configuring an inactivity timer outside this range. They should also ignore received ITO options that are outside this range.</t>
 
-<t>On the other hand, on-path attackers may try to reduce the idle timeout to
-a very low value (e.g. one second), so that any session that experiences
-a short idle duration would be dropped, effectively causes a type of DoS attack.</t>
+<t>Since the ITO option is neither encrypted nor authenticated, on-path attackers and middleboxes could remove, add or modify the ITO option on observed Multipath TCP connections.</t>
 
-<t>To mitigate this attack, the hosts supporting this option SHOULD restrict
-the valid idle timeout value in a safe range. The hosts MAY either cap
-the requested timeout value to the upper/lower threshold or just ignore it.</t>
+</section>
+<section anchor="iana-considerations" title="IANA Considerations">
 
-<t>Furthermore, the hosts could limit the numbers of the long idle sessions,
-When the system resources are under pressure, it could start shedding those
-connections with longest idle time and from untrusted peers.</t>
+<t>IANA is requested to assign a MPTCP option subtype for the ITO option from the “MPTCP Option Subtypes” available at https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml</t>
 
 </section>
 
@@ -272,6 +191,22 @@ connections with longest idle time and from untrusted peers.</t>
     <references title='Informative References'>
 
 
+
+
+
+<reference  anchor="RFC6824" target='https://www.rfc-editor.org/info/rfc6824'>
+<front>
+<title>TCP Extensions for Multipath Operation with Multiple Addresses</title>
+<author initials='A.' surname='Ford' fullname='A. Ford'><organization /></author>
+<author initials='C.' surname='Raiciu' fullname='C. Raiciu'><organization /></author>
+<author initials='M.' surname='Handley' fullname='M. Handley'><organization /></author>
+<author initials='O.' surname='Bonaventure' fullname='O. Bonaventure'><organization /></author>
+<date year='2013' month='January' />
+<abstract><t>TCP/IP communication is currently restricted to a single path per connection, yet multiple paths often exist between peers.  The simultaneous use of these multiple paths for a TCP/IP session would improve resource usage within the network and, thus, improve user experience through higher throughput and improved resilience to network failure.</t><t>Multipath TCP provides the ability to simultaneously use multiple paths between peers.  This document presents a set of extensions to traditional TCP to support multipath operation.  The protocol offers the same type of service to applications as TCP (i.e., reliable bytestream), and it provides the components necessary to establish and use multiple TCP flows across potentially disjoint paths.  This  document defines an Experimental Protocol for the Internet community.</t></abstract>
+</front>
+<seriesInfo name='RFC' value='6824'/>
+<seriesInfo name='DOI' value='10.17487/RFC6824'/>
+</reference>
 
 
 
@@ -312,6 +247,33 @@ connections with longest idle time and from untrusted peers.</t>
 
 
 
+<reference  anchor="RFC0793" target='https://www.rfc-editor.org/info/rfc793'>
+<front>
+<title>Transmission Control Protocol</title>
+<author initials='J.' surname='Postel' fullname='J. Postel'><organization /></author>
+<date year='1981' month='September' />
+</front>
+<seriesInfo name='STD' value='7'/>
+<seriesInfo name='RFC' value='793'/>
+<seriesInfo name='DOI' value='10.17487/RFC0793'/>
+</reference>
+
+
+
+<reference  anchor="RFC1122" target='https://www.rfc-editor.org/info/rfc1122'>
+<front>
+<title>Requirements for Internet Hosts - Communication Layers</title>
+<author initials='R.' surname='Braden' fullname='R. Braden' role='editor'><organization /></author>
+<date year='1989' month='October' />
+<abstract><t>This RFC is an official specification for the Internet community.  It incorporates by reference, amends, corrects, and supplements the primary protocol standards documents relating to hosts.  [STANDARDS-TRACK]</t></abstract>
+</front>
+<seriesInfo name='STD' value='3'/>
+<seriesInfo name='RFC' value='1122'/>
+<seriesInfo name='DOI' value='10.17487/RFC1122'/>
+</reference>
+
+
+
 <reference  anchor="RFC5482" target='https://www.rfc-editor.org/info/rfc5482'>
 <front>
 <title>TCP User Timeout Option</title>
@@ -326,6 +288,21 @@ connections with longest idle time and from untrusted peers.</t>
 
 
 
+<reference  anchor="RFC8040" target='https://www.rfc-editor.org/info/rfc8040'>
+<front>
+<title>RESTCONF Protocol</title>
+<author initials='A.' surname='Bierman' fullname='A. Bierman'><organization /></author>
+<author initials='M.' surname='Bjorklund' fullname='M. Bjorklund'><organization /></author>
+<author initials='K.' surname='Watsen' fullname='K. Watsen'><organization /></author>
+<date year='2017' month='January' />
+<abstract><t>This document describes an HTTP-based protocol that provides a programmatic interface for accessing data defined in YANG, using the datastore concepts defined in the Network Configuration Protocol (NETCONF).</t></abstract>
+</front>
+<seriesInfo name='RFC' value='8040'/>
+<seriesInfo name='DOI' value='10.17487/RFC8040'/>
+</reference>
+
+
+
 
     </references>
 
@@ -334,87 +311,92 @@ connections with longest idle time and from untrusted peers.</t>
   </back>
 
 <!-- ##markdown-source:
-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
+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
 
 -->
 
