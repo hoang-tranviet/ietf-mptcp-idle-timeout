@@ -8,8 +8,8 @@ Intended status: Informational          Universite catholique de Louvain
 Expires: January 6, 2020                                   July 05, 2019
 
 
-                   Multipath TCP Idle Lifetime Option
-                      draft-mptcp-idle-lifetime-00
+                  Multipath TCP Inactivity Time Option
+                     draft-mptcp-inactivity-time-00
 
 Abstract
 
@@ -55,7 +55,7 @@ Copyright Notice
 
 Tran & Bonaventure       Expires January 6, 2020                [Page 1]
 
-Internet-Draft             mptcp-idle-lifetime                 July 2019
+Internet-Draft            mptcp-inactivity-time                July 2019
 
 
 Table of Contents
@@ -111,7 +111,7 @@ Table of Contents
 
 Tran & Bonaventure       Expires January 6, 2020                [Page 2]
 
-Internet-Draft             mptcp-idle-lifetime                 July 2019
+Internet-Draft            mptcp-inactivity-time                July 2019
 
 
    Multipath TCP connection state must be managed when all the TCP
@@ -167,7 +167,7 @@ Internet-Draft             mptcp-idle-lifetime                 July 2019
 
 Tran & Bonaventure       Expires January 6, 2020                [Page 3]
 
-Internet-Draft             mptcp-idle-lifetime                 July 2019
+Internet-Draft            mptcp-inactivity-time                July 2019
 
 
    termination of the last subflow associated to an existing Multipath
@@ -197,8 +197,10 @@ Internet-Draft             mptcp-idle-lifetime                 July 2019
 
    The Multipath TCP Inactivity Timer Option (MPTCP ITO) is used to
    exchange the Inactivivity Timer associated to this connection.  This
-   documents recommends a default value of 2 hours as discussed in
-   [RFC1122].
+   documents recommends a default value of 2 hours and 4 minutes - the
+   same as default NAT timeout as discussed in [RFC5382].  The reason
+   for this value is to allow the peer with default keepalive timer of 2
+   hours ([RFC1122]) to probe successfully.
 
 4.1.  Option Format
 
@@ -215,17 +217,17 @@ Internet-Draft             mptcp-idle-lifetime                 July 2019
 
               Figure 1: MPTCP Inactivity Timer Option Format
 
-   In the ITO option, the Inactivity Timer (16 bits) specifies the
-   requested Timer for the MPTCP session in seconds.  A value of zero
 
 
 
 
 Tran & Bonaventure       Expires January 6, 2020                [Page 4]
 
-Internet-Draft             mptcp-idle-lifetime                 July 2019
+Internet-Draft            mptcp-inactivity-time                July 2019
 
 
+   In the ITO option, the Inactivity Timer (16 bits) specifies the
+   requested Timer for the MPTCP session in seconds.  A value of zero
    indicates that the state for the Multipath TCP connection will be
    removed as soon as there is no active subflow.
 
@@ -272,16 +274,15 @@ Internet-Draft             mptcp-idle-lifetime                 July 2019
    supported at the MPTCP layer.  To implement the idle timeout option,
    these implementations may use the MPTCP KeepAliveTime value to keep
    track of the current idle time.  However, the idle timeout mechanism,
-   when activated, should override the keepalive mechanism.  This means
-
 
 
 
 Tran & Bonaventure       Expires January 6, 2020                [Page 5]
 
-Internet-Draft             mptcp-idle-lifetime                 July 2019
+Internet-Draft            mptcp-inactivity-time                July 2019
 
 
+   when activated, should override the keepalive mechanism.  This means
    that after the idle timeout fired, the host should abort the
    connection instead of sending the TCP keepalives.
 
@@ -325,18 +326,23 @@ Internet-Draft             mptcp-idle-lifetime                 July 2019
 
 8.2.  Informative References
 
-   [I-D.ietf-mptcp-rfc6824bis]
-              Ford, A., Raiciu, C., Handley, M., Bonaventure, O., and C.
-              Paasch, "TCP Extensions for Multipath Operation with
-              Multiple Addresses", draft-ietf-mptcp-rfc6824bis-18 (work
-              in progress), June 2019.
+
+
+
+
 
 
 
 Tran & Bonaventure       Expires January 6, 2020                [Page 6]
 
-Internet-Draft             mptcp-idle-lifetime                 July 2019
+Internet-Draft            mptcp-inactivity-time                July 2019
 
+
+   [I-D.ietf-mptcp-rfc6824bis]
+              Ford, A., Raiciu, C., Handley, M., Bonaventure, O., and C.
+              Paasch, "TCP Extensions for Multipath Operation with
+              Multiple Addresses", draft-ietf-mptcp-rfc6824bis-18 (work
+              in progress), June 2019.
 
    [RFC0793]  Postel, J., "Transmission Control Protocol", STD 7,
               RFC 793, DOI 10.17487/RFC0793, September 1981,
@@ -346,6 +352,11 @@ Internet-Draft             mptcp-idle-lifetime                 July 2019
               Communication Layers", STD 3, RFC 1122,
               DOI 10.17487/RFC1122, October 1989,
               <https://www.rfc-editor.org/info/rfc1122>.
+
+   [RFC5382]  Guha, S., Ed., Biswas, K., Ford, B., Sivakumar, S., and P.
+              Srisuresh, "NAT Behavioral Requirements for TCP", BCP 142,
+              RFC 5382, DOI 10.17487/RFC5382, October 2008,
+              <https://www.rfc-editor.org/info/rfc5382>.
 
    [RFC5482]  Eggert, L. and F. Gont, "TCP User Timeout Option",
               RFC 5482, DOI 10.17487/RFC5482, March 2009,
@@ -375,17 +386,6 @@ Authors' Addresses
    Belgium
 
    Email: olivier.bonaventure@uclouvain.be
-
-
-
-
-
-
-
-
-
-
-
 
 
 

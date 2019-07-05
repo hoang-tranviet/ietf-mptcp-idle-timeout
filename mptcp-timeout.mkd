@@ -1,7 +1,7 @@
 ---
-title: Multipath TCP Idle Lifetime Option
-abbrev: mptcp-idle-lifetime
-docname: draft-mptcp-idle-lifetime-00
+title: Multipath TCP Inactivity Time Option
+abbrev: mptcp-inactivity-time
+docname: draft-mptcp-inactivity-time-00
 date: 2019-07-05
 category: info
 
@@ -37,6 +37,7 @@ informative:
   I-D.ietf-mptcp-rfc6824bis:
   RFC0793:
   RFC1122:
+  RFC5382:
   RFC5482:
   RFC8040:
 
@@ -92,7 +93,7 @@ This document proposes the utilisation of an Inactivity timer in Multipath TCP i
 The Multipath TCP Inactivity Timer Option   {#ops}
 =========================================
 
-The Multipath TCP Inactivity Timer Option (MPTCP ITO) is used to exchange the Inactivivity Timer associated to this connection. This documents recommends a default value of 2 hours as discussed in {{RFC1122}}. 
+The Multipath TCP Inactivity Timer Option (MPTCP ITO) is used to exchange the Inactivivity Timer associated to this connection. This documents recommends a default value of 2 hours and 4 minutes - the same as default NAT timeout as discussed in {{RFC5382}}. The reason for this value is to allow the peer with default keepalive timer of 2 hours ({{RFC1122}}) to probe successfully.
 
 
 Option Format      {#format}
