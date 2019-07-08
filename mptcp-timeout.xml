@@ -33,7 +33,7 @@
       </address>
     </author>
 
-    <date year="2019" month="July" day="05"/>
+    <date year="2019" month="July" day="08"/>
 
     <area>TSV</area>
     <workgroup>MPTCP Working Group</workgroup>
@@ -66,11 +66,9 @@ TCP implementations create state when a connection starts and maintain this stat
   <t>the per-TCP subflows connection states</t>
 </list></t>
 
-<t>The per-TCP state of each subflow is managed according to <xref target="RFC0793"/>. The Multipath TCP connection state also needs to be managed. We consider a subflow to be active if its TCP state machine exists and is in the Established state.  We call inactive a Multipath TCP connection that currently has no active subflow. It is important to note that it is possible for one host to consider a given Multipath TCP connection to be inactive while the other endpoint considers that the connection is still active. This can happen for example when some packets are lost or when one of the hosts has received a spurious RST on the only active subflow. <xref target="RFC6824"/> and <xref target="I-D.ietf-mptcp-rfc6824bis"/> specify how this state can be removed upon transmission or reception of a FAST_CLOSE and after having exchanged DATA_FINs. However, <xref target="RFC6824"/> and <xref target="I-D.ietf-mptcp-rfc6824bis"/> do not specify precisely how the Multipath TCP connection state must be managed when all the TCP subflows associated to this Multipath TCP connection have been released. A similar problem existed in TCP for idle connections. It was clarified in <xref target="RFC1122"/>.</t>
+<t>The per-TCP state of each subflow is managed according to <xref target="RFC0793"/>. The Multipath TCP connection state also needs to be managed. We consider a subflow to be active if its TCP state machine exists and is in the Established state.  We call inactive a Multipath TCP connection that currently has no active subflow. It is important to note that it is possible for one host to consider a given Multipath TCP connection to be inactive while the other endpoint considers that the connection is still active. This can happen for example when some packets are lost or when one of the hosts has received a spurious RST on the only active subflow. <xref target="RFC6824"/> and <xref target="I-D.ietf-mptcp-rfc6824bis"/> specify how this state can be removed upon transmission or reception of a FASTCLOSE and after having exchanged DATA_FINs. However, <xref target="RFC6824"/> and <xref target="I-D.ietf-mptcp-rfc6824bis"/> do not specify precisely how the Multipath TCP connection state must be managed when all the TCP subflows associated with this Multipath TCP connection have been released. A similar problem existed in TCP for idle connections. It was clarified in <xref target="RFC1122"/>.</t>
 
 <t>Given the cost of maintaining state for inactive Multipath TCP connections, hosts may want to limit the time during which they maintain state for inactive Multipath TCP connections. Neither <xref target="RFC6824"/> nor <xref target="I-D.ietf-mptcp-rfc6824bis"/> propose a default duration to maintain this state. Although some applications such as http/1.1 include a mechanism to terminate idle connections, many applications do not do this. We fill this gap in this document and propose a Multipath TCP option that enables hosts to agree on a common minimum duration to maintain inactive Multipath TCP connections.</t>
-
-<t>This document is organised as follows.</t>
 
 </section>
 <section anchor="Terminology" title="Terminology">
@@ -81,7 +79,7 @@ and “OPTIONAL” are to be interpreted as described in BCP 14, RFC 2119 <xref 
 </section>
 <section anchor="define" title="Lifetime of Multipath TCP connections">
 
-<t>A Multipath TCP connection starts with a three-way-handshake that uses the MP_CAPABLE option and ends with either the transmission of DATA_FINs or a FAST_CLOSE. Between these two events, the number of subflows that compose the connection may vary and during some periods of time, it is possible that no active subflow is associated to an existing Multipath TCP connection.</t>
+<t>A Multipath TCP connection starts with a three-way-handshake that uses the MP_CAPABLE option and ends with either the transmission of DATA_FINs or a FASTCLOSE. Between these two events, the number of subflows that compose the connection may vary and during some periods of time, it is possible that no active subflow is associated with an existing Multipath TCP connection.</t>
 
 <t>There are several types of events which can occur during the lifetime of a Multipath TCP connection:</t>
 
@@ -91,14 +89,14 @@ and “OPTIONAL” are to be interpreted as described in BCP 14, RFC 2119 <xref 
   <t>abrupt termination of a subflow due to multiple expirations of its retransmission timer, the reception of a RST or an abnormal packet, …</t>
 </list></t>
 
-<t>To support the establishment of a new subflow with the MP_JOIN option, a host must maintain state for all established Multipath TCP connection. Neither <xref target="RFC6824"/> nor <xref target="I-D.ietf-mptcp-rfc6824bis"/> specify how a host should behave upon (graceful or abrupt) termination of the last subflow associated to an existing Multipath TCP connection. One possibility would be to consider that since no subflow is associated with this connection, its state could be freed. A consequence of this policy is that it would then be impossible to establish a new subflow to this connection to recover from the failure of the previous one. Another possibility is to preserve the state of this Multipath TCP connection for some period of time. This would better match the expectations of mobile use cases where subflows can fail abruptly when devices move.</t>
+<t>To support the establishment of a new subflow with the MP_JOIN option, a host must maintain state for all established Multipath TCP connection. Neither <xref target="RFC6824"/> nor <xref target="I-D.ietf-mptcp-rfc6824bis"/> specify how a host should behave upon (graceful or abrupt) termination of the last subflow associated with an existing Multipath TCP connection. One possibility would be to consider that since no subflow is associated with this connection, its state could be freed. A consequence of this policy is that it would then be impossible to establish a new subflow to this connection to recover from the failure of the previous one. Another possibility is to preserve the state of this Multipath TCP connection for some period of time. This would better match the expectations of mobile use cases where subflows can fail abruptly when devices move.</t>
 
-<t>This document proposes the utilisation of an Inactivity timer in Multipath TCP implementations. This timer bounds the time during which there is no active subflow associated to a given Multipath TCP connection. It starts when the last active subflow associated to a connection is terminated. It is reset when one active subflow is associated to this Multipath TCP connection. Upon expiration of this timer, the host SHOULD remove state for the associated Multipath TCP connection. If a host wants to maintain a Multipath TCP connection as active, it SHOULD try to reestablish a subflow associated to this Multipath TCP connection before the expiration of its inactivity timer. This document suggests to start the reestablishment of such a subflow after half the Inactivity timer.</t>
+<t>This document proposes the utilisation of an Inactivity timer in Multipath TCP implementations. This timer bounds the time during which there is no active subflow associated with a given Multipath TCP connection. It starts when the last active subflow associated with a connection is terminated. It is reset when one active subflow is associated with this Multipath TCP connection. Upon expiration of this timer, the host SHOULD remove state for the associated Multipath TCP connection. If a host wants to maintain a Multipath TCP connection as active, it SHOULD try to reestablish a subflow associated with this Multipath TCP connection before the expiration of its inactivity timer. This document suggests implementations to start the reestablishment of such a subflow after half the Inactivity timer.</t>
 
 </section>
 <section anchor="ops" title="The Multipath TCP Inactivity Timer Option">
 
-<t>The Multipath TCP Inactivity Timer Option (MPTCP ITO) is used to exchange the Inactivivity Timer associated to this connection. This documents recommends a default value of 2 hours and 4 minutes - the same as default NAT timeout as discussed in <xref target="RFC5382"/>. The reason for this value is to allow the peer with default keepalive timer of 2 hours (<xref target="RFC1122"/>) to probe successfully.</t>
+<t>The Multipath TCP Inactivity Timer Option (MPTCP ITO) is used to exchange the Inactivity Timer associated with this connection. This documents recommends a default value of 2 hours and 4 minutes - the same as default NAT timeout as discussed in <xref target="RFC5382"/>. The reason for this value is to allow the peer with default keepalive timer of 2 hours (<xref target="RFC1122"/>) to probe successfully.</t>
 
 <section anchor="format" title="Option Format">
 
@@ -120,7 +118,7 @@ and “OPTIONAL” are to be interpreted as described in BCP 14, RFC 2119 <xref 
 </section>
 <section anchor="ito-option-and-local-policies" title="ITO Option and Local Policies">
 
-<t>The ITO option is used to specify the value of the Inactivity timer associated to the connection by the host that sends the option. Upon reception of this option, the receiver MAY choose to transmit its own ITO option. A host MAY decide to update its ITO option based on the ITO option received from its peer. Note that the ITO option is an indicative value.  A host may terminate long inactive connections before the expiration of the ITO timer due to the increasing memory resource pressure.</t>
+<t>The ITO option is used to specify the value of the Inactivity timer associated with the connection by the host that sends the option. Upon reception of this option, the receiver SHOULD update its ITO option based on the ITO option received from its peer. However, it MAY choose to apply and transmit its own ITO option, depending on its local policies. Note that the ITO option is an indicative value. A host may terminate long inactive connections before the expiration of the ITO timer due to the increasing memory resource pressure.</t>
 
 <t>Like all Multipath TCP options, the ITO Option is exchanged without any protection from TCP’s reliability mechanisms.  Therefore, implementations MUST NOT assume that it is transferred reliably. Implementations that use the ITO option can transmit the ITO option at any time. Since the utilisation of this option is not negotiated during the connection handshake, a host MUST NOT send more than three ITO options on a connection where it has not received any ITO option.</t>
 
@@ -156,7 +154,13 @@ may use the MPTCP KeepAliveTime value to keep track of the current idle time. Ho
 </section>
 <section anchor="iana-considerations" title="IANA Considerations">
 
-<t>IANA is requested to assign a MPTCP option subtype for the ITO option from the “MPTCP Option Subtypes” available at https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml</t>
+<t>IANA is requested to assign an MPTCP option subtype for the ITO option from the “MPTCP Option Subtypes” available at https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml</t>
+
+</section>
+<section anchor="acknowledgements" title="Acknowledgements">
+
+<t>This work was supported by the ARC-SDN project and
+the Walinnov MQUIC project, No. 1810018.</t>
 
 </section>
 
@@ -329,94 +333,95 @@ may use the MPTCP KeepAliveTime value to keep track of the current idle time. Ho
   </back>
 
 <!-- ##markdown-source:
-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
-U+Tu53xzqDT5HzMgK1KVKwAA
+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
 
 -->
 

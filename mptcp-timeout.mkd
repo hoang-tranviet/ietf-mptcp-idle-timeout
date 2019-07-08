@@ -2,7 +2,7 @@
 title: Multipath TCP Inactivity Time Option
 abbrev: mptcp-inactivity-time
 docname: draft-mptcp-inactivity-time-00
-date: 2019-07-05
+date: 2019-07-08
 category: info
 
 ipr: trust200902
@@ -59,11 +59,9 @@ TCP implementations create state when a connection starts and maintain this stat
  - the per-Multipath TCP connection state that includes the connection keys, data sequence numbers, ...
  - the per-TCP subflows connection states
  
-The per-TCP state of each subflow is managed according to {{RFC0793}}. The Multipath TCP connection state also needs to be managed. We consider a subflow to be active if its TCP state machine exists and is in the Established state.  We call inactive a Multipath TCP connection that currently has no active subflow. It is important to note that it is possible for one host to consider a given Multipath TCP connection to be inactive while the other endpoint considers that the connection is still active. This can happen for example when some packets are lost or when one of the hosts has received a spurious RST on the only active subflow. {{RFC6824}} and {{I-D.ietf-mptcp-rfc6824bis}} specify how this state can be removed upon transmission or reception of a FAST_CLOSE and after having exchanged DATA_FINs. However, {{RFC6824}} and {{I-D.ietf-mptcp-rfc6824bis}} do not specify precisely how the Multipath TCP connection state must be managed when all the TCP subflows associated to this Multipath TCP connection have been released. A similar problem existed in TCP for idle connections. It was clarified in {{RFC1122}}.
+The per-TCP state of each subflow is managed according to {{RFC0793}}. The Multipath TCP connection state also needs to be managed. We consider a subflow to be active if its TCP state machine exists and is in the Established state.  We call inactive a Multipath TCP connection that currently has no active subflow. It is important to note that it is possible for one host to consider a given Multipath TCP connection to be inactive while the other endpoint considers that the connection is still active. This can happen for example when some packets are lost or when one of the hosts has received a spurious RST on the only active subflow. {{RFC6824}} and {{I-D.ietf-mptcp-rfc6824bis}} specify how this state can be removed upon transmission or reception of a FASTCLOSE and after having exchanged DATA_FINs. However, {{RFC6824}} and {{I-D.ietf-mptcp-rfc6824bis}} do not specify precisely how the Multipath TCP connection state must be managed when all the TCP subflows associated with this Multipath TCP connection have been released. A similar problem existed in TCP for idle connections. It was clarified in {{RFC1122}}.
 
 Given the cost of maintaining state for inactive Multipath TCP connections, hosts may want to limit the time during which they maintain state for inactive Multipath TCP connections. Neither {{RFC6824}} nor {{I-D.ietf-mptcp-rfc6824bis}} propose a default duration to maintain this state. Although some applications such as http/1.1 include a mechanism to terminate idle connections, many applications do not do this. We fill this gap in this document and propose a Multipath TCP option that enables hosts to agree on a common minimum duration to maintain inactive Multipath TCP connections.
-
-This document is organised as follows. 
 
 
 Terminology          {#Terminology}
@@ -77,7 +75,7 @@ and "OPTIONAL" are to be interpreted as described in BCP 14, RFC 2119 {{RFC2119}
 Lifetime of Multipath TCP connections  {#define}
 =====================================
 
-A Multipath TCP connection starts with a three-way-handshake that uses the MP_CAPABLE option and ends with either the transmission of DATA_FINs or a FAST_CLOSE. Between these two events, the number of subflows that compose the connection may vary and during some periods of time, it is possible that no active subflow is associated to an existing Multipath TCP connection. 
+A Multipath TCP connection starts with a three-way-handshake that uses the MP_CAPABLE option and ends with either the transmission of DATA_FINs or a FASTCLOSE. Between these two events, the number of subflows that compose the connection may vary and during some periods of time, it is possible that no active subflow is associated with an existing Multipath TCP connection. 
 
 There are several types of events which can occur during the lifetime of a Multipath TCP connection:
 
@@ -85,15 +83,15 @@ There are several types of events which can occur during the lifetime of a Multi
  - graceful termination of subflow with the exchange of FINs 
  - abrupt termination of a subflow due to multiple expirations of its retransmission timer, the reception of a RST or an abnormal packet, ...
  
-To support the establishment of a new subflow with the MP_JOIN option, a host must maintain state for all established Multipath TCP connection. Neither {{RFC6824}} nor {{I-D.ietf-mptcp-rfc6824bis}} specify how a host should behave upon (graceful or abrupt) termination of the last subflow associated to an existing Multipath TCP connection. One possibility would be to consider that since no subflow is associated with this connection, its state could be freed. A consequence of this policy is that it would then be impossible to establish a new subflow to this connection to recover from the failure of the previous one. Another possibility is to preserve the state of this Multipath TCP connection for some period of time. This would better match the expectations of mobile use cases where subflows can fail abruptly when devices move.
+To support the establishment of a new subflow with the MP_JOIN option, a host must maintain state for all established Multipath TCP connection. Neither {{RFC6824}} nor {{I-D.ietf-mptcp-rfc6824bis}} specify how a host should behave upon (graceful or abrupt) termination of the last subflow associated with an existing Multipath TCP connection. One possibility would be to consider that since no subflow is associated with this connection, its state could be freed. A consequence of this policy is that it would then be impossible to establish a new subflow to this connection to recover from the failure of the previous one. Another possibility is to preserve the state of this Multipath TCP connection for some period of time. This would better match the expectations of mobile use cases where subflows can fail abruptly when devices move.
 
-This document proposes the utilisation of an Inactivity timer in Multipath TCP implementations. This timer bounds the time during which there is no active subflow associated to a given Multipath TCP connection. It starts when the last active subflow associated to a connection is terminated. It is reset when one active subflow is associated to this Multipath TCP connection. Upon expiration of this timer, the host SHOULD remove state for the associated Multipath TCP connection. If a host wants to maintain a Multipath TCP connection as active, it SHOULD try to reestablish a subflow associated to this Multipath TCP connection before the expiration of its inactivity timer. This document suggests to start the reestablishment of such a subflow after half the Inactivity timer. 
+This document proposes the utilisation of an Inactivity timer in Multipath TCP implementations. This timer bounds the time during which there is no active subflow associated with a given Multipath TCP connection. It starts when the last active subflow associated with a connection is terminated. It is reset when one active subflow is associated with this Multipath TCP connection. Upon expiration of this timer, the host SHOULD remove state for the associated Multipath TCP connection. If a host wants to maintain a Multipath TCP connection as active, it SHOULD try to reestablish a subflow associated with this Multipath TCP connection before the expiration of its inactivity timer. This document suggests implementations to start the reestablishment of such a subflow after half the Inactivity timer. 
  
 
 The Multipath TCP Inactivity Timer Option   {#ops}
 =========================================
 
-The Multipath TCP Inactivity Timer Option (MPTCP ITO) is used to exchange the Inactivivity Timer associated to this connection. This documents recommends a default value of 2 hours and 4 minutes - the same as default NAT timeout as discussed in {{RFC5382}}. The reason for this value is to allow the peer with default keepalive timer of 2 hours ({{RFC1122}}) to probe successfully.
+The Multipath TCP Inactivity Timer Option (MPTCP ITO) is used to exchange the Inactivity Timer associated with this connection. This documents recommends a default value of 2 hours and 4 minutes - the same as default NAT timeout as discussed in {{RFC5382}}. The reason for this value is to allow the peer with default keepalive timer of 2 hours ({{RFC1122}}) to probe successfully.
 
 
 Option Format      {#format}
@@ -118,7 +116,7 @@ In the ITO option, the Inactivity Timer (16 bits) specifies the requested Timer 
 ITO Option and Local Policies
 -----------------------------
 
-The ITO option is used to specify the value of the Inactivity timer associated to the connection by the host that sends the option. Upon reception of this option, the receiver MAY choose to transmit its own ITO option. A host MAY decide to update its ITO option based on the ITO option received from its peer. Note that the ITO option is an indicative value.  A host may terminate long inactive connections before the expiration of the ITO timer due to the increasing memory resource pressure.
+The ITO option is used to specify the value of the Inactivity timer associated with the connection by the host that sends the option. Upon reception of this option, the receiver SHOULD update its ITO option based on the ITO option received from its peer. However, it MAY choose to apply and transmit its own ITO option, depending on its local policies. Note that the ITO option is an indicative value. A host may terminate long inactive connections before the expiration of the ITO timer due to the increasing memory resource pressure.
 
 Like all Multipath TCP options, the ITO Option is exchanged without any protection from TCP's reliability mechanisms.  Therefore, implementations MUST NOT assume that it is transferred reliably. Implementations that use the ITO option can transmit the ITO option at any time. Since the utilisation of this option is not negotiated during the connection handshake, a host MUST NOT send more than three ITO options on a connection where it has not received any ITO option.
 
@@ -155,6 +153,13 @@ IANA Considerations
 ===================
 
 
-IANA is requested to assign a MPTCP option subtype for the ITO option from the "MPTCP Option Subtypes" available at https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml
+IANA is requested to assign an MPTCP option subtype for the ITO option from the "MPTCP Option Subtypes" available at https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xhtml
+
+
+Acknowledgements
+================
+
+This work was supported by the ARC-SDN project and
+the Walinnov MQUIC project, No. 1810018.
 
 --- back
